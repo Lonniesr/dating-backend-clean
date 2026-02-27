@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  password           String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  inviteCode         String?
+  username           String?
+  birthdate          DateTime?
+  gender             String?
+  name               String?
+  onboardingComplete Boolean        @default(false)
+  photos             String[]       @default([])
+  preferences        Json?
+  prompts            Json?
+  role               String         @default("user")
+  age                Int?
+  bio                String?
+  birthplace         String?
+  location           String?
+  adminFlags         Json?
+  adminNotes         String?
+  banned             Boolean        @default(false)
+  lastActiveAt       DateTime?
+  verified           Boolean        @default(false)
+  race               String?
+  Admin              Admin?
+  conversationsA     Conversation[] @relation("UserAConversations")
+  conversationsB     Conversation[] @relation("UserBConversations")
+  invitesSent        Invite[]       @relation("Invite_invitedByIdToUser")
+  invitesUsed        Invite[]       @relation("Invite_usedByIdToUser")
+  matchesAsUserA     Match[]        @relation("Match_userA")
+  matchesAsUserB     Match[]        @relation("Match_userB")
+  receivedMessages   Message[]      @relation("ReceivedMessages")
+  sentMessages       Message[]      @relation("SentMessages")
+  swipesGiven        Swipe[]        @relation("Swipe_swiperIdToUser")
+  swipesReceived     Swipe[]        @relation("Swipe_targetIdToUser")
+}
+
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  userId    String?  @unique
+  User      User?    @relation(fields: [userId], references: [id])
+}
+
+model AdminSettings {
+  id              String   @id @default("admin-settings")
+  maintenanceMode Boolean  @default(false)
+  siteName        String   @default("Lynq Admin")
+  supportEmail    String   @default("support@example.com")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Conversation {
+  id            String    @id @default(uuid())
+  userAId       String
+  userBId       String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageId String?
+  lastMessage   Message?  @relation("LastMessage", fields: [lastMessageId], references: [id])
+  userA         User      @relation("UserAConversations", fields: [userAId], references: [id])
+  userB         User      @relation("UserBConversations", fields: [userBId], references: [id])
+  messages      Message[]
+}
+
+model Invite {
+  id                            Int       @id @default(autoincrement())
+  code                          String    @unique
+  createdAt                     DateTime  @default(now())
+  used                          Boolean   @default(false)
+  usedAt                        DateTime?
+  email                         String?
+  usedById                      String?
+  expiresAt                     DateTime?
+  invitedById                   String?
+  premium                       Boolean   @default(false)
+  User_Invite_invitedByIdToUser User?     @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id])
+  User_Invite_usedByIdToUser    User?     @relation("Invite_usedByIdToUser", fields: [usedById], references: [id])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  userAId   String
+  userBId   String
+  userA     User     @relation("Match_userA", fields: [userAId], references: [id])
+  userB     User     @relation("Match_userB", fields: [userBId], references: [id])
+}
+
+model Message {
+  id                 String         @id @default(uuid())
+  senderId           String
+  receiverId         String
+  createdAt          DateTime       @default(now())
+  text               String?
+  audioUrl           String?
+  imageUrl           String?
+  reaction           String?
+  read               Boolean        @default(false)
+  delivered          Boolean        @default(false)
+  conversationId     String?
+  lastInConversation Conversation[] @relation("LastMessage")
+  conversation       Conversation?  @relation(fields: [conversationId], references: [id])
+  receiver           User           @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender             User           @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+model Swipe {
+  id                        String   @id @default(uuid())
+  swiperId                  String
+  targetId                  String
+  direction                 String
+  createdAt                 DateTime @default(now())
+  User_Swipe_swiperIdToUser User     @relation("Swipe_swiperIdToUser", fields: [swiperId], references: [id])
+  User_Swipe_targetIdToUser User     @relation("Swipe_targetIdToUser", fields: [targetId], references: [id])
+
+  @@unique([swiperId, targetId])
+}

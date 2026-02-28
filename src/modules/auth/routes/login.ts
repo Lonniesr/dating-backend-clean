@@ -3,7 +3,11 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import prisma from "../../../prisma";
 import { env } from "../../../config/env";
-import { checkBruteForce, registerFailure, resetFailures } from "../../../middleware/bruteForce";
+import {
+  checkBruteForce,
+  registerFailure,
+  resetFailures,
+} from "../../../middleware/bruteForce";
 
 const router = Router();
 
@@ -33,8 +37,9 @@ router.post("/", async (req, res) => {
 
     await resetFailures(email, "user");
 
+    // 🔐 CLEAN JWT (database is source of truth)
     const token = jwt.sign(
-      { id: user.id, role: user.role, email: user.email },
+      { sub: user.id },
       env.JWT_SECRET,
       { expiresIn: "7d" }
     );

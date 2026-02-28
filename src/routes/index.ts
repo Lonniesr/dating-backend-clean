@@ -2,7 +2,6 @@ import { Router } from "express";
 
 import authRoutes from "../modules/auth/routes";
 import meRouter from "../modules/auth/routes/me";
-import adminLoginRouter from "../modules/admin/routes/login"; // ✅ admin login
 
 import onboardingRoutes from "../modules/onboarding/routes";
 // import inviteRoutes from "../modules/invite/routes";
@@ -30,7 +29,6 @@ router.use("/auth", authRoutes);
  * Creates:
  *   POST /api/admin/login
  */
-router.use("/admin/login", adminLoginRouter);
 
 /**
  * CURRENT USER (frontend compatibility)

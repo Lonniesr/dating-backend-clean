@@ -1,63 +1,108 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
+import prisma from "../../../prisma";
+import { requireAdmin } from "../../../middleware/requireAdmin";
 
 const router = Router();
 
-// GET /api/admin/users/:id
-router.get("/users/:id", async (req: any, res) => {
-  const prisma = req.prisma;
-  const userId = req.params.id;
+/* =========================
+   TYPES
+========================= */
 
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        age: true,
-        location: true,
-        photos: true,
-        createdAt: true,
-        lastActiveAt: true,
+interface UserListQuery {
+  page?: string;
+  limit?: string;
+  search?: string;
+}
 
-        matchesInitiated: {
-          select: {
-            id: true,
-            createdAt: true,
-            userB: { select: { id: true, name: true } },
-          },
+/* =========================
+   GET /api/admin/users
+========================= */
+
+router.get(
+  "/",
+  requireAdmin,
+  async (req: Request<{}, {}, {}, UserListQuery>, res: Response) => {
+    try {
+      const page = req.query.page ? parseInt(req.query.page, 10) || 1 : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit, 10) || 20 : 20;
+      const search = req.query.search?.trim() || "";
+
+      let where: any = {};
+
+      if (search) {
+        where = {
+          OR: [
+            {
+              email: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+            {
+              name: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        };
+      }
+
+      const users = await prisma.user.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          verified: true,
+          banned: true,
+          createdAt: true,
+          lastActiveAt: true,
         },
-        matchesReceived: {
-          select: {
-            id: true,
-            createdAt: true,
-            userA: { select: { id: true, name: true } },
-          },
-        },
-      },
-    });
+      });
 
-    if (!user) return res.status(404).json({ error: "User not found" });
+      const total = await prisma.user.count({ where });
 
-    const matches = [
-      ...user.matchesInitiated.map((m: any) => ({
-        id: m.id,
-        createdAt: m.createdAt,
-        otherUserId: m.userB.id,
-        otherUserName: m.userB.name,
-      })),
-      ...user.matchesReceived.map((m: any) => ({
-        id: m.id,
-        createdAt: m.createdAt,
-        otherUserId: m.userA.id,
-        otherUserName: m.userA.name,
-      })),
-    ];
-
-    return res.json({ ...user, matches });
-  } catch (err) {
-    console.error("ADMIN USER DETAIL ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+      return res.json({
+        users,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      });
+    } catch (err) {
+      console.error("ADMIN USER LIST ERROR:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
   }
-});
+);
+
+/* =========================
+   GET /api/admin/users/:id
+========================= */
+
+router.get(
+  "/:id",
+  requireAdmin,
+  async (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.params.id },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      return res.json(user);
+    } catch (err) {
+      console.error("ADMIN USER DETAIL ERROR:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+);
 
 export default router;

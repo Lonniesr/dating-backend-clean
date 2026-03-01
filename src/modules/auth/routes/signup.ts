@@ -22,24 +22,34 @@ router.post("/", async (req: Request, res: Response) => {
       where: { code: invite },
     });
 
-    if (!inviteRecord) return res.status(400).json({ reason: "not_found" });
-    if (inviteRecord.used) return res.status(400).json({ reason: "used" });
+    if (!inviteRecord) {
+      return res.status(400).json({ reason: "not_found" });
+    }
+
+    if (inviteRecord.used) {
+      return res.status(400).json({ reason: "used" });
+    }
+
     if (inviteRecord.expiresAt && inviteRecord.expiresAt < new Date()) {
       return res.status(400).json({ reason: "expired" });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (existing) {
       return res.status(400).json({ message: "Email already registered." });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: {
         email,
-        password: hashed,
+        password: hashedPassword,
         onboardingComplete: false,
+        role: "user", // default role
       },
       select: {
         id: true,
@@ -58,7 +68,15 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    const token = jwt.sign({ id: user.id }, env.JWT_SECRET, { expiresIn: "7d" });
+    // ✅ STANDARDIZED JWT STRUCTURE
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        role: user.role,
+      },
+      env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     res.cookie("token", token, {
       httpOnly: true,

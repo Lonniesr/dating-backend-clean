@@ -1,42 +1,72 @@
 import { Router } from "express";
+import os from "os";
+import prisma from "../../../prisma";
+import { requireAdmin } from "../../../middleware/requireAdmin";
+import { createClient } from "redis";
+import packageJson from "../../../../package.json";
 
 const router = Router();
 
-// GET /api/admin/system/health
-router.get("/system/health", async (req: any, res) => {
-  const prisma = req.prisma;
+/**
+ * GET /api/admin/system/health
+ */
+router.get("/health", requireAdmin, async (_req, res) => {
+  const start = Date.now();
 
+  let api = "OK";
+  let db = "OK";
+  let redis = "DISABLED";
+
+  // -------------------------
+  // Database Check
+  // -------------------------
   try {
-    const api = "OK";
-
-    let db = "OK";
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-    } catch {
-      db = "ERROR";
-    }
-
-    const queue = "OK";
-
-    const start = Date.now();
     await prisma.$queryRaw`SELECT 1`;
-    const latency = Date.now() - start;
-
-    const uptime = 99.98;
-    const errorRate = 0.12;
-
-    return res.json({
-      api,
-      db,
-      queue,
-      latency,
-      uptime,
-      errorRate,
-    });
-  } catch (err) {
-    console.error("SYSTEM HEALTH ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+  } catch {
+    db = "ERROR";
   }
+
+  // -------------------------
+  // Redis Check (optional)
+  // -------------------------
+  if (process.env.REDIS_URL) {
+    try {
+      const client = createClient({ url: process.env.REDIS_URL });
+      await client.connect();
+      await client.ping();
+      await client.disconnect();
+      redis = "OK";
+    } catch {
+      redis = "ERROR";
+    }
+  }
+
+  // -------------------------
+  // System Metrics
+  // -------------------------
+  const latency = Date.now() - start;
+
+  const memoryUsage = process.memoryUsage();
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+
+  const cpuLoad = os.loadavg()[0]; // 1-minute average
+
+  res.json({
+    api,
+    db,
+    redis,
+    latency,
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    version: packageJson.version,
+    memory: {
+      usedMB: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
+      totalMB: (totalMem / 1024 / 1024).toFixed(0),
+      freeMB: (freeMem / 1024 / 1024).toFixed(0),
+    },
+    cpuLoad: cpuLoad.toFixed(2),
+  });
 });
 
 export default router;

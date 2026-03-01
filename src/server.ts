@@ -23,7 +23,10 @@ import { env } from "./config/env";
 const app = express();
 const server = http.createServer(app);
 
-// Required for Render / reverse proxies
+/* =========================
+   TRUST PROXY (Render / Nginx)
+========================= */
+
 app.set("trust proxy", 1);
 
 /* =========================
@@ -32,6 +35,10 @@ app.set("trust proxy", 1);
 
 app.use(
   helmet({
+    contentSecurityPolicy:
+      env.NODE_ENV === "production"
+        ? undefined
+        : false, // Disable CSP in dev to avoid Vite issues
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
@@ -44,7 +51,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   CORS (HARDENED)
+   CORS (STRICT IN PROD)
 ========================= */
 
 const allowedOrigins = (env.CORS_ORIGIN || "")
@@ -55,10 +62,8 @@ const allowedOrigins = (env.CORS_ORIGIN || "")
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow Postman / server-to-server
       if (!origin) return callback(null, true);
 
-      // Development → allow localhost
       if (env.NODE_ENV !== "production") {
         if (
           origin.startsWith("http://localhost") ||
@@ -68,7 +73,6 @@ app.use(
         }
       }
 
-      // Production → strict match only
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
@@ -81,21 +85,30 @@ app.use(
 );
 
 /* =========================
-   RATE LIMITING
+   GLOBAL RATE LIMITER
+========================= */
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api", globalLimiter);
+
+/* =========================
+   AUTH RATE LIMITS
 ========================= */
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
 });
 
 app.use("/api/auth", authLimiter);
@@ -106,7 +119,11 @@ app.use("/api/auth/login", loginLimiter);
 ========================= */
 
 app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).json({ status: "ok" });
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime(),
+    env: env.NODE_ENV,
+  });
 });
 
 /* =========================
@@ -124,7 +141,7 @@ app.get("/", (_req: Request, res: Response) => {
 ========================= */
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Global error:", err);
+  console.error("🔥 Global error:", err);
 
   res.status(err?.status || 500).json({
     message:
@@ -156,11 +173,7 @@ async function setupRedis() {
   }
 
   try {
-    const pubClient = createClient({
-      url: env.REDIS_URL,
-      socket: { reconnectStrategy: false },
-    });
-
+    const pubClient = createClient({ url: env.REDIS_URL });
     const subClient = pubClient.duplicate();
 
     pubClient.on("error", (e) => console.error("Redis Pub Error:", e));

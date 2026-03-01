@@ -3,6 +3,10 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import prisma from "../prisma";
 import { env } from "../config/env";
 
+/* =========================
+   AUTH USER TYPE
+========================= */
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -12,6 +16,10 @@ export interface AuthUser {
   preferences: any | null;
 }
 
+/* =========================
+   EXPRESS REQUEST AUGMENTATION
+========================= */
+
 declare global {
   namespace Express {
     interface Request {
@@ -20,25 +28,52 @@ declare global {
   }
 }
 
+/* =========================
+   TOKEN EXTRACTION (FIXED)
+========================= */
+
 function getToken(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) return authHeader.split(" ")[1];
-  if (req.cookies?.token) return req.cookies.token;
+
+  // Bearer token
+  if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+
+  // Cookie token (SAFE NARROWING)
+  const cookieToken = req.cookies?.token;
+
+  if (typeof cookieToken === "string") {
+    return cookieToken;
+  }
+
   return undefined;
 }
 
-function getUserIdFromPayload(payload: string | JwtPayload): string | undefined {
+/* =========================
+   JWT PAYLOAD EXTRACTION
+========================= */
+
+function getUserIdFromPayload(
+  payload: string | JwtPayload
+): string | undefined {
   if (typeof payload === "string") return undefined;
 
-  // Prefer JWT "sub" if present
-  if (typeof payload.sub === "string" && payload.sub) return payload.sub;
+  if (typeof payload.sub === "string" && payload.sub) {
+    return payload.sub;
+  }
 
-  // Support legacy payloads like { id: "..." }
   const maybeId = (payload as any).id;
-  if (typeof maybeId === "string" && maybeId) return maybeId;
+  if (typeof maybeId === "string" && maybeId) {
+    return maybeId;
+  }
 
   return undefined;
 }
+
+/* =========================
+   REQUIRE USER MIDDLEWARE
+========================= */
 
 export async function requireUser(
   req: Request,
@@ -54,7 +89,7 @@ export async function requireUser(
     }
 
     const decoded = jwt.verify(token, env.JWT_SECRET);
-    const userId = getUserIdFromPayload(decoded as any);
+    const userId = getUserIdFromPayload(decoded);
 
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });

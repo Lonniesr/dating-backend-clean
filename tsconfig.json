@@ -6,8 +6,15 @@
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+
+    /* 🔥 REQUIRED FOR package.json IMPORT */
+    "resolveJsonModule": true,
+
+    /* Helps modern TS resolution */
+    "moduleResolution": "node"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

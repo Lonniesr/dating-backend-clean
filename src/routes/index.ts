@@ -29,7 +29,6 @@ import adminSwipeRoutes from "../modules/admin/routes/admin.swipe";
 import adminMatchesRoutes from "../modules/admin/routes/admin.matches";
 import adminVerificationRoutes from "../modules/admin/routes/admin.verification";
 import adminMessagesRoutes from "../modules/admin/routes/admin.messages";
-import adminNotesRoutes from "../modules/admin/routes/admin.notes";
 import adminSettingsRoutes from "../modules/admin/routes/admin.settings";
 
 const router = Router();
@@ -73,7 +72,6 @@ router.use("/admin/swipe", adminSwipeRoutes);
 router.use("/admin/matches", adminMatchesRoutes);
 router.use("/admin/verification", adminVerificationRoutes);
 router.use("/admin/messages", adminMessagesRoutes);
-router.use("/admin/notes", adminNotesRoutes);
 router.use("/admin/settings", adminSettingsRoutes);
 
 /* =========================

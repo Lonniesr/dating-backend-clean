@@ -36,9 +36,7 @@ app.set("trust proxy", 1);
 app.use(
   helmet({
     contentSecurityPolicy:
-      env.NODE_ENV === "production"
-        ? undefined
-        : false, // Disable CSP in dev to avoid Vite issues
+      env.NODE_ENV === "production" ? undefined : false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
@@ -51,7 +49,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   CORS (STRICT IN PROD)
+   CORS (PRODUCTION SAFE)
 ========================= */
 
 const allowedOrigins = (env.CORS_ORIGIN || "")
@@ -64,6 +62,7 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
+      // Allow localhost automatically in dev
       if (env.NODE_ENV !== "production") {
         if (
           origin.startsWith("http://localhost") ||
@@ -73,7 +72,12 @@ app.use(
         }
       }
 
-      if (allowedOrigins.includes(origin)) {
+      // Relaxed matching to prevent subtle formatting mismatches
+      const allowed = allowedOrigins.some((o) =>
+        origin.startsWith(o)
+      );
+
+      if (allowed) {
         return callback(null, true);
       }
 

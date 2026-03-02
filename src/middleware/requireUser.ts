@@ -10,6 +10,7 @@ import { env } from "../config/env";
 export interface AuthUser {
   id: string;
   email: string;
+  role: string; // ✅ ADDED
   onboardingComplete: boolean;
   name: string | null;
   gender: string | null;
@@ -29,18 +30,16 @@ declare global {
 }
 
 /* =========================
-   TOKEN EXTRACTION (FIXED)
+   TOKEN EXTRACTION
 ========================= */
 
 function getToken(req: Request): string | undefined {
   const authHeader = req.headers.authorization;
 
-  // Bearer token
   if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
     return authHeader.split(" ")[1];
   }
 
-  // Cookie token (SAFE NARROWING)
   const cookieToken = req.cookies?.token;
 
   if (typeof cookieToken === "string") {
@@ -101,6 +100,7 @@ export async function requireUser(
       select: {
         id: true,
         email: true,
+        role: true, // ✅ ADDED
         onboardingComplete: true,
         name: true,
         gender: true,

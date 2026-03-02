@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireAdmin } from "../../../middleware/requireAdmin";
 import crypto from "crypto";
@@ -9,7 +9,7 @@ const router = Router();
 /* =========================
    GET ALL INVITES
 ========================= */
-router.get("/", requireAdmin, async (_req, res) => {
+router.get("/", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const invites = await prisma.invite.findMany({
       orderBy: { createdAt: "desc" },
@@ -30,7 +30,7 @@ router.get("/", requireAdmin, async (_req, res) => {
 /* =========================
    CREATE INVITE
 ========================= */
-router.post("/", requireAdmin, async (req, res) => {
+router.post("/", requireAdmin, async (req: Request, res: Response) => {
   try {
     console.log("=== CREATE INVITE DEBUG ===");
     console.log("BODY:", req.body);
@@ -38,7 +38,7 @@ router.post("/", requireAdmin, async (req, res) => {
 
     const { email, expiresAt, premium } = req.body;
 
-    if (!req.user || !req.user.id) {
+    if (!req.user?.id) {
       console.error("Missing req.user or user.id");
       return res.status(401).json({ error: "Unauthorized" });
     }

@@ -32,7 +32,16 @@ router.get("/", requireAdmin, async (_req, res) => {
 ========================= */
 router.post("/", requireAdmin, async (req, res) => {
   try {
+    console.log("=== CREATE INVITE DEBUG ===");
+    console.log("BODY:", req.body);
+    console.log("USER:", req.user);
+
     const { email, expiresAt, premium } = req.body;
+
+    if (!req.user || !req.user.id) {
+      console.error("Missing req.user or user.id");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     const code = crypto.randomBytes(16).toString("hex");
 
@@ -42,7 +51,7 @@ router.post("/", requireAdmin, async (req, res) => {
         email: email || null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         premium: Boolean(premium),
-        invitedById: req.user!.id,
+        invitedById: req.user.id,
       },
     });
 
@@ -57,9 +66,13 @@ router.post("/", requireAdmin, async (req, res) => {
       ...invite,
       inviteUrl,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("INVITE CREATE ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+
+    return res.status(500).json({
+      error: "Invite creation failed",
+      details: err?.message || err,
+    });
   }
 });
 

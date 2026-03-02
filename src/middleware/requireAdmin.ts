@@ -14,7 +14,6 @@ export async function requireAdmin(
   next: NextFunction
 ) {
   try {
-    // 🔐 Read token from httpOnly cookie
     const token = req.cookies?.token;
 
     if (!token) {
@@ -29,7 +28,6 @@ export async function requireAdmin(
       return res.status(401).json({ error: "Invalid or expired token" });
     }
 
-    // Extract user id from JWT
     const userId =
       typeof payload.sub === "string" ? payload.sub : payload.id;
 
@@ -37,22 +35,17 @@ export async function requireAdmin(
       return res.status(401).json({ error: "Invalid token payload" });
     }
 
-    // 🔎 Database is source of truth
+    // 🔥 Fetch FULL user (not partial select)
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-      },
     });
 
     if (!user || user.role !== "admin") {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    // Attach admin user to request
-    (req as any).admin = user;
+    // Attach full user object
+    (req as any).user = user;
 
     next();
   } catch (err) {

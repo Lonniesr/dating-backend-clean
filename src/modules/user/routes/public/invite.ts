@@ -1,43 +1,120 @@
-import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { Router, Request, Response } from "express";
+import prisma from "../../../../prisma";
 
 const router = Router();
 
 /**
  * GET /api/invite/:code
- * Public invite validation route
+ * Public invite validation + scan tracking
  */
-router.get("/:code", async (req, res) => {
-  try {
-    const { code } = req.params;
+router.get(
+  "/:code",
+  async (
+    req: Request<{ code: string }>,
+    res: Response
+  ) => {
+    try {
+      const code = req.params.code;
 
-    const invite = await prisma.invite.findUnique({
-      where: { code },
-    });
+      if (!code) {
+        return res.status(400).json({ error: "Invite code required" });
+      }
 
-    if (!invite) {
-      return res.status(404).json({ error: "Invite not found" });
+      const invite = await prisma.invite.findUnique({
+        where: { code },
+      });
+
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+
+      /* =========================
+         SAFE STRING NORMALIZATION
+      ========================= */
+
+      const userAgentHeader = req.headers["user-agent"];
+      const userAgent =
+        typeof userAgentHeader === "string"
+          ? userAgentHeader
+          : "";
+
+      const ipAddress =
+        typeof req.ip === "string"
+          ? req.ip
+          : "";
+
+      /* =========================
+         BASIC DEVICE DETECTION
+      ========================= */
+
+      let device = "desktop";
+
+      if (/mobile/i.test(userAgent)) device = "mobile";
+      if (/tablet/i.test(userAgent)) device = "tablet";
+
+      /* =========================
+         TRACK SCAN
+      ========================= */
+
+      await prisma.inviteScan.create({
+        data: {
+          inviteId: invite.id,
+          device,
+          browser: null,
+          os: null,
+          ip: ipAddress || null,
+        },
+      });
+
+      /* =========================
+         INCREMENT SCAN COUNTER
+      ========================= */
+
+      const updatedInvite = await prisma.invite.update({
+        where: { id: invite.id },
+        data: {
+          scanCount: { increment: 1 },
+        },
+      });
+
+      /* =========================
+         VALIDATION
+      ========================= */
+
+      if (updatedInvite.used) {
+        return res.status(400).json({
+          error: "Invite already used",
+          scanCount: updatedInvite.scanCount,
+        });
+      }
+
+      if (
+        updatedInvite.expiresAt &&
+        updatedInvite.expiresAt < new Date()
+      ) {
+        return res.status(410).json({
+          error: "Invite expired",
+          expiresAt: updatedInvite.expiresAt,
+          scanCount: updatedInvite.scanCount,
+        });
+      }
+
+      return res.json({
+        valid: true,
+        code: updatedInvite.code,
+        premium: updatedInvite.premium,
+        expiresAt: updatedInvite.expiresAt,
+        used: updatedInvite.used,
+        scanCount: updatedInvite.scanCount,
+      });
+
+    } catch (error) {
+      console.error("Public invite lookup error:", error);
+      return res.status(500).json({
+        error: "Failed to validate invite",
+      });
     }
-
-    if (invite.used) {
-      return res.status(400).json({ error: "Invite already used" });
-    }
-
-    if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-      return res.status(400).json({ error: "Invite expired" });
-    }
-
-    res.json({
-      valid: true,
-      code: invite.code,
-    });
-
-  } catch (error) {
-    console.error("Public invite lookup error:", error);
-    res.status(500).json({ error: "Failed to validate invite" });
   }
-});
+);
 
 export default router;

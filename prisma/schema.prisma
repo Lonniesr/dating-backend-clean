@@ -11,7 +11,7 @@ model User {
   id                 String         @id @default(uuid())
   email              String         @unique
   password           String
-  theme String? @default("light")
+  theme              String?        @default("light")
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   inviteCode         String?
@@ -34,6 +34,7 @@ model User {
   lastActiveAt       DateTime?
   verified           Boolean        @default(false)
   race               String?
+
   Admin              Admin?
   conversationsA     Conversation[] @relation("UserAConversations")
   conversationsB     Conversation[] @relation("UserBConversations")
@@ -89,8 +90,31 @@ model Invite {
   expiresAt                     DateTime?
   invitedById                   String?
   premium                       Boolean   @default(false)
+
+  // 🔥 Growth Analytics
+  scanCount                     Int       @default(0)
+  signupCount                   Int       @default(0)
+
   User_Invite_invitedByIdToUser User?     @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id])
   User_Invite_usedByIdToUser    User?     @relation("Invite_usedByIdToUser", fields: [usedById], references: [id])
+
+  scans                         InviteScan[]
+}
+
+model InviteScan {
+  id        Int      @id @default(autoincrement())
+  inviteId  Int
+  createdAt DateTime @default(now())
+
+  // 🔥 Device Analytics
+  device    String?
+  browser   String?
+  os        String?
+  ip        String?
+
+  invite    Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  @@index([inviteId])
 }
 
 model Match {
@@ -126,6 +150,7 @@ model Swipe {
   targetId                  String
   direction                 String
   createdAt                 DateTime @default(now())
+
   User_Swipe_swiperIdToUser User     @relation("Swipe_swiperIdToUser", fields: [swiperId], references: [id])
   User_Swipe_targetIdToUser User     @relation("Swipe_targetIdToUser", fields: [targetId], references: [id])
 

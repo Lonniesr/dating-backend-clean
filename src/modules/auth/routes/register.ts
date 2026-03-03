@@ -7,21 +7,57 @@ const router = Router();
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body as { email?: string; password?: string };
+    const {
+      email,
+      password,
+      inviteCode,
+    }: {
+      email?: string;
+      password?: string;
+      inviteCode?: string;
+    } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password required" });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
+
     if (existing) {
       return res.status(400).json({ error: "Email already in use" });
+    }
+
+    let invite = null;
+
+    // 🔥 Validate invite if provided
+    if (inviteCode) {
+      invite = await prisma.invite.findUnique({
+        where: { code: inviteCode },
+      });
+
+      if (!invite) {
+        return res.status(400).json({ error: "Invalid invite code" });
+      }
+
+      if (invite.used) {
+        return res.status(400).json({ error: "Invite already used" });
+      }
+
+      if (invite.expiresAt && invite.expiresAt < new Date()) {
+        return res.status(400).json({ error: "Invite expired" });
+      }
     }
 
     const hash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
-      data: { email, password: hash },
+      data: {
+        email,
+        password: hash,
+        inviteCode: invite?.code ?? null,
+      },
       select: {
         id: true,
         email: true,
@@ -31,11 +67,21 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    // Optional: auto-login on register (if you want)
-    // If you don't want register to issue a cookie, remove this block.
-    // const token = jwt.sign({ id: user.id }, env.JWT_SECRET, { expiresIn: "7d" });
+    // 🔥 If invite used → update analytics
+    if (invite) {
+      await prisma.invite.update({
+        where: { id: invite.id },
+        data: {
+          used: true,
+          usedAt: new Date(),
+          usedById: user.id,
+          signupCount: { increment: 1 },
+        },
+      });
+    }
 
     return res.status(201).json({ user });
+
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     return res.status(500).json({ error: "Server error" });

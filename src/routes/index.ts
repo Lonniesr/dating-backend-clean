@@ -30,6 +30,7 @@ import adminMatchesRoutes from "../modules/admin/routes/admin.matches";
 import adminVerificationRoutes from "../modules/admin/routes/admin.verification";
 import adminMessagesRoutes from "../modules/admin/routes/admin.messages";
 import adminSettingsRoutes from "../modules/admin/routes/admin.settings";
+import analyticsRouter from "../modules/admin/routes/admin.analytics";
 
 const router = Router();
 
@@ -73,6 +74,7 @@ router.use("/admin/matches", adminMatchesRoutes);
 router.use("/admin/verification", adminVerificationRoutes);
 router.use("/admin/messages", adminMessagesRoutes);
 router.use("/admin/settings", adminSettingsRoutes);
+router.use("/analytics", analyticsRouter);
 
 /* =========================
    EXPORT

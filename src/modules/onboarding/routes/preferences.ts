@@ -1,12 +1,16 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { requireUser } from "../../../middleware/requireUser";
 import prisma from "../../../prisma";
 
 const router = Router();
 
-router.post("/", requireUser, async (req: any, res) => {
+router.post("/", requireUser, async (req: any, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const { preferences } = req.body;
 
     if (!preferences) {
@@ -21,7 +25,9 @@ router.post("/", requireUser, async (req: any, res) => {
       locationRadius,
     } = preferences;
 
-    // ----- Basic Validation -----
+    /* ==============================
+       VALIDATION
+    ============================== */
 
     if (!interestedIn || typeof interestedIn !== "string") {
       return res.status(400).json({ error: "InterestedIn is required" });
@@ -41,7 +47,7 @@ router.post("/", requireUser, async (req: any, res) => {
     }
 
     // Allow null radius (means "any")
-    if (locationRadius !== null) {
+    if (locationRadius !== null && locationRadius !== undefined) {
       locationRadius = Number(locationRadius);
 
       if (
@@ -51,30 +57,57 @@ router.post("/", requireUser, async (req: any, res) => {
       ) {
         return res.status(400).json({ error: "Invalid location radius" });
       }
+    } else {
+      locationRadius = null;
     }
 
-    // ----- Update Safely -----
+    /* ==============================
+       FETCH CURRENT USER (SAFE MERGE)
+    ============================== */
 
-    const existing = req.user.preferences || {};
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
 
-    const updated = await prisma.user.update({
+    if (!currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const existingPreferences =
+      typeof currentUser.preferences === "object" &&
+      currentUser.preferences !== null
+        ? currentUser.preferences
+        : {};
+
+    /* ==============================
+       UPDATE USER
+    ============================== */
+
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         preferences: {
-          ...existing, // preserve future fields
+          ...existingPreferences,
           interestedIn,
           racePreference: racePreference || null,
           minAge,
           maxAge,
-          locationRadius: locationRadius ?? null,
+          locationRadius,
         },
+      },
+      select: {
+        id: true,
+        preferences: true,
       },
     });
 
-    return res.json({ user: updated });
+    return res.json({ user: updatedUser });
   } catch (err) {
     console.error("PREFERENCES UPDATE ERROR:", err);
-    return res.status(500).json({ error: "Failed to update preferences" });
+    return res.status(500).json({
+      error: "Failed to update preferences",
+    });
   }
 });
 

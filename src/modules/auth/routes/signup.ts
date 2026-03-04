@@ -14,6 +14,10 @@ router.post("/", async (req: Request, res: Response) => {
   };
 
   try {
+    /* =========================
+       VALIDATION
+    ========================= */
+
     if (!email || !password || !invite) {
       return res.status(400).json({ message: "Missing required fields." });
     }
@@ -34,13 +38,17 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ reason: "expired" });
     }
 
-    const existing = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
-    if (existing) {
+    if (existingUser) {
       return res.status(400).json({ message: "Email already registered." });
     }
+
+    /* =========================
+       CREATE USER
+    ========================= */
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -49,7 +57,8 @@ router.post("/", async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         onboardingComplete: false,
-        role: "user", // default role
+        role: "user",
+        inviteCode: inviteRecord.code,
       },
       select: {
         id: true,
@@ -59,16 +68,24 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
+    /* =========================
+       UPDATE INVITE (ANALYTICS)
+    ========================= */
+
     await prisma.invite.update({
       where: { id: inviteRecord.id },
       data: {
         used: true,
         usedAt: new Date(),
         usedById: user.id,
+        signupCount: { increment: 1 },
       },
     });
 
-    // ✅ STANDARDIZED JWT STRUCTURE
+    /* =========================
+       ISSUE JWT
+    ========================= */
+
     const token = jwt.sign(
       {
         sub: user.id,
@@ -78,17 +95,24 @@ router.post("/", async (req: Request, res: Response) => {
       { expiresIn: "7d" }
     );
 
+    /* =========================
+       COOKIE CONFIG (FIXED)
+    ========================= */
+
+    const isProduction = env.NODE_ENV === "production";
+
     res.cookie("token", token, {
       httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+      secure: isProduction, // true only on HTTPS production
+      sameSite: isProduction ? "none" : "lax", // lax for localhost
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.json({ success: true, user });
-  } catch (err) {
-    console.error("SIGNUP ERROR:", err);
+
+  } catch (error) {
+    console.error("SIGNUP ERROR:", error);
     return res.status(500).json({ success: false });
   }
 });

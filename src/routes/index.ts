@@ -13,6 +13,7 @@ import discoverRoutes from "../modules/discover/routes";
 import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
 import chatUploadRoute from "../modules/upload/routes/chatUploadRoute";
+import publicInviteRoutes from "../modules/user/routes/public/invite"; // ✅ PUBLIC INVITE ROUTE
 
 /* =========================
    ADMIN ROUTES
@@ -22,7 +23,6 @@ import adminDashboardRoutes from "../modules/admin/routes/admin.dashboard";
 import adminInvitesRoutes from "../modules/admin/routes/admin.invites";
 import adminUsersRoutes from "../modules/admin/routes/admin.users";
 import adminSystemRoutes from "../modules/admin/routes/admin.system";
-
 import adminRolesRoutes from "../modules/admin/routes/admin.roles";
 import adminBansRoutes from "../modules/admin/routes/admin.bans";
 import adminSwipeRoutes from "../modules/admin/routes/admin.swipe";
@@ -39,10 +39,6 @@ const router = Router();
 ========================= */
 
 router.use("/auth", authRoutes);
-
-/**
- * GET /api/me
- */
 router.use("/me", meRouter);
 
 /* =========================
@@ -51,6 +47,7 @@ router.use("/me", meRouter);
 
 router.use("/onboarding", onboardingRoutes);
 router.use("/user", userRoutes);
+router.use("/invite", publicInviteRoutes); // ✅ FIXED (now /api/invite/:code works)
 router.use("/upload/chat", chatUploadRoute);
 router.use("/match", matchRoutes);
 router.use("/messages", messageRoutes);
@@ -66,7 +63,6 @@ router.use("/admin/dashboard", adminDashboardRoutes);
 router.use("/admin/users", adminUsersRoutes);
 router.use("/admin/invites", adminInvitesRoutes);
 router.use("/admin/system", adminSystemRoutes);
-
 router.use("/admin/roles", adminRolesRoutes);
 router.use("/admin/bans", adminBansRoutes);
 router.use("/admin/swipe", adminSwipeRoutes);
@@ -74,10 +70,6 @@ router.use("/admin/matches", adminMatchesRoutes);
 router.use("/admin/verification", adminVerificationRoutes);
 router.use("/admin/messages", adminMessagesRoutes);
 router.use("/admin/settings", adminSettingsRoutes);
-router.use("/analytics", analyticsRouter);
-
-/* =========================
-   EXPORT
-========================= */
+router.use("/admin/analytics", analyticsRouter);
 
 export default router;

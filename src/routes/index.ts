@@ -13,7 +13,12 @@ import discoverRoutes from "../modules/discover/routes";
 import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
 import chatUploadRoute from "../modules/upload/routes/chatUploadRoute";
-import publicInviteRoutes from "../modules/user/routes/public/invite"; // ✅ PUBLIC INVITE ROUTE
+import publicInviteRoutes from "../modules/user/routes/public/invite";
+
+import profileCompletionRoutes from "../modules/user/routes/profileCompletion";
+import matchCountRoutes from "../modules/user/routes/matchCount";
+import statsRoutes from "../modules/user/routes/stats";
+import photosRouter from "../modules/user/routes/photos"; // ✅ correct import path
 
 /* =========================
    ADMIN ROUTES
@@ -35,19 +40,26 @@ import analyticsRouter from "../modules/admin/routes/admin.analytics";
 const router = Router();
 
 /* =========================
-   AUTH
+   AUTH DOMAIN
 ========================= */
 
 router.use("/auth", authRoutes);
-router.use("/me", meRouter);
+router.use("/auth/me", meRouter); // ✅ ensures /api/auth/me
 
 /* =========================
    USER DOMAIN
 ========================= */
 
 router.use("/onboarding", onboardingRoutes);
+
+// Mount all user sub-routes cleanly under /api/user/*
 router.use("/user", userRoutes);
-router.use("/invite", publicInviteRoutes); // ✅ FIXED (now /api/invite/:code works)
+router.use("/user/photos", photosRouter);
+router.use("/user/profile-completion", profileCompletionRoutes);
+router.use("/user/match-count", matchCountRoutes);
+router.use("/user/swipe-stats", statsRoutes);
+
+router.use("/invite", publicInviteRoutes);
 router.use("/upload/chat", chatUploadRoute);
 router.use("/match", matchRoutes);
 router.use("/messages", messageRoutes);
@@ -56,7 +68,6 @@ router.use("/swipe", swipeRoutes);
 
 /* =========================
    ADMIN DOMAIN
-   Mounted at /api/admin/*
 ========================= */
 
 router.use("/admin/dashboard", adminDashboardRoutes);

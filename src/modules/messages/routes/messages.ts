@@ -6,12 +6,28 @@ const router = Router();
 
 /**
  * GET /api/messages/:id
- * Returns full chat history with a specific user
+ * Returns chat history with a specific user
  */
 router.get("/:id", requireUser, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const otherId = req.params.id;
+
+    // Ensure users are matched
+    const match = await prisma.match.findFirst({
+      where: {
+        OR: [
+          { userAId: userId, userBId: otherId },
+          { userAId: otherId, userBId: userId },
+        ],
+      },
+    });
+
+    if (!match) {
+      return res
+        .status(403)
+        .json({ message: "You can only message users you matched with." });
+    }
 
     // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
@@ -32,9 +48,11 @@ router.get("/:id", requireUser, async (req: any, res) => {
       });
     }
 
+    // Fetch latest 50 messages
     const messages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
     });
 
     // Mark unread messages as read
@@ -47,7 +65,7 @@ router.get("/:id", requireUser, async (req: any, res) => {
       data: { read: true },
     });
 
-    res.json(messages);
+    res.json(messages.reverse());
   } catch (err) {
     console.error("CHAT FETCH ERROR:", err);
     res.status(500).json({ message: "Failed to load chat." });
@@ -63,6 +81,26 @@ router.post("/:id", requireUser, async (req: any, res) => {
     const senderId = req.user.id;
     const receiverId = req.params.id;
     const { text } = req.body;
+
+    if (!text || text.trim().length === 0) {
+      return res.status(400).json({ message: "Message cannot be empty." });
+    }
+
+    // Ensure users are matched
+    const match = await prisma.match.findFirst({
+      where: {
+        OR: [
+          { userAId: senderId, userBId: receiverId },
+          { userAId: receiverId, userBId: senderId },
+        ],
+      },
+    });
+
+    if (!match) {
+      return res
+        .status(403)
+        .json({ message: "You can only message users you matched with." });
+    }
 
     // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
@@ -93,7 +131,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
       },
     });
 
-    // Update lastMessage pointer
+    // Update conversation
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {

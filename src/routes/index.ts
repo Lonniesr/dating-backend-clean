@@ -81,8 +81,14 @@ router.use("/user/verify", verificationRoutes);
    INVITE SYSTEM
 ========================= */
 
-router.use("/invite", publicInviteRoutes); // GET /api/invite/:code
-router.use("/invite", inviteRoutes);       // POST /api/invite
+/**
+ * IMPORTANT:
+ * Specific invite routes must come BEFORE the dynamic /:code route
+ * otherwise Express will treat "stats" and "leaderboard" as invite codes.
+ */
+
+router.use("/invite", inviteRoutes);        // POST /invite, GET /invite/stats, GET /invite/leaderboard
+router.use("/invite", publicInviteRoutes);  // GET /invite/:code
 
 router.use("/upload/chat", chatUploadRoute);
 

@@ -14,12 +14,18 @@ import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
 import chatUploadRoute from "../modules/upload/routes/chatUploadRoute";
 import publicInviteRoutes from "../modules/user/routes/public/invite";
-import inviteRoutes from "../modules/invite/routes"; // ✅ invite creation
+import inviteRoutes from "../modules/invite/routes";
 
 import profileCompletionRoutes from "../modules/user/routes/profileCompletion";
 import matchCountRoutes from "../modules/user/routes/matchCount";
 import statsRoutes from "../modules/user/routes/stats";
 import photosRouter from "../modules/user/routes/photos";
+
+/* =========================
+   VERIFICATION ROUTE
+========================= */
+
+import verificationRoutes from "../modules/user/routes/verification";
 
 /* =========================
    SETTINGS ROUTES
@@ -64,6 +70,12 @@ router.use("/user/photos", photosRouter);
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);
+
+/* =========================
+   USER VERIFICATION
+========================= */
+
+router.use("/user/verify", verificationRoutes);
 
 /* =========================
    INVITE SYSTEM

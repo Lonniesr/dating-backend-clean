@@ -14,6 +14,38 @@ router.get("/", (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/invite/stats
+ * Returns invite statistics for the logged in user
+ */
+router.get("/stats", requireUser, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.id;
+
+    const sent = await prisma.invite.count({
+      where: {
+        invitedById: userId,
+      },
+    });
+
+    const joined = await prisma.invite.count({
+      where: {
+        invitedById: userId,
+        used: true,
+      },
+    });
+
+    return res.json({
+      sent,
+      joined,
+    });
+
+  } catch (err) {
+    console.error("INVITE STATS ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
  * POST /api/invite
  * Generate invite
  */

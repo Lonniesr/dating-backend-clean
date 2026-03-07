@@ -14,6 +14,7 @@ import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
 import chatUploadRoute from "../modules/upload/routes/chatUploadRoute";
 import publicInviteRoutes from "../modules/user/routes/public/invite";
+import inviteRoutes from "../modules/invite/routes"; // ✅ invite creation
 
 import profileCompletionRoutes from "../modules/user/routes/profileCompletion";
 import matchCountRoutes from "../modules/user/routes/matchCount";
@@ -64,8 +65,13 @@ router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);
 
-// Public + utilities
-router.use("/invite", publicInviteRoutes);
+/* =========================
+   INVITE SYSTEM
+========================= */
+
+router.use("/invite", publicInviteRoutes); // GET /api/invite/:code
+router.use("/invite", inviteRoutes);       // POST /api/invite
+
 router.use("/upload/chat", chatUploadRoute);
 
 /* =========================

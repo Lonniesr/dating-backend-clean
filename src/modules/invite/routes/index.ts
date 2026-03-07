@@ -6,14 +6,6 @@ import { requireUser } from "../../../middleware/requireUser";
 const router = Router();
 
 /**
- * GET /api/invite
- * Test route
- */
-router.get("/", (req: Request, res: Response) => {
-  res.json({ message: "Invite route working" });
-});
-
-/**
  * GET /api/invite/stats
  */
 router.get("/stats", requireUser, async (req: any, res: Response) => {
@@ -21,9 +13,7 @@ router.get("/stats", requireUser, async (req: any, res: Response) => {
     const userId = req.user.id;
 
     const sent = await prisma.invite.count({
-      where: {
-        invitedById: userId,
-      },
+      where: { invitedById: userId },
     });
 
     const joined = await prisma.invite.count({
@@ -33,10 +23,7 @@ router.get("/stats", requireUser, async (req: any, res: Response) => {
       },
     });
 
-    return res.json({
-      sent,
-      joined,
-    });
+    return res.json({ sent, joined });
 
   } catch (err) {
     console.error("INVITE STATS ERROR:", err);
@@ -47,47 +34,28 @@ router.get("/stats", requireUser, async (req: any, res: Response) => {
 /**
  * GET /api/invite/leaderboard
  */
-router.get("/leaderboard", async (_req: Request, res: Response) => {
+router.get("/leaderboard", async (_req, res) => {
   try {
 
     const invites = await prisma.invite.groupBy({
       by: ["invitedById"],
-      where: {
-        used: true,
-        invitedById: {
-          not: null,
-        },
-      },
-      _count: {
-        id: true,
-      },
-      orderBy: {
-        _count: {
-          id: "desc",
-        },
-      },
+      where: { used: true },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
       take: 10,
     });
 
     const userIds = invites
-      .map((i) => i.invitedById)
-      .filter((id): id is string => id !== null);
+      .map(i => i.invitedById)
+      .filter(Boolean) as string[];
 
     const users = await prisma.user.findMany({
-      where: {
-        id: {
-          in: userIds,
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-      },
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, username: true },
     });
 
-    const leaderboard = invites.map((entry) => {
-      const user = users.find((u) => u.id === entry.invitedById);
+    const leaderboard = invites.map(entry => {
+      const user = users.find(u => u.id === entry.invitedById);
 
       return {
         userId: entry.invitedById,
@@ -96,140 +64,105 @@ router.get("/leaderboard", async (_req: Request, res: Response) => {
       };
     });
 
-    return res.json({ leaderboard });
+    res.json({ leaderboard });
 
   } catch (err) {
-    console.error("INVITE LEADERBOARD ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error("LEADERBOARD ERROR:", err);
+    res.status(500).json({});
   }
 });
 
 /**
- * GET /api/invite/mutual/:targetUserId
- * Finds if two users share the same inviter
+ * GET mutual invite relationship
  */
-router.get(
-  "/mutual/:targetUserId",
-  requireUser,
-  async (req: any, res: Response) => {
-    try {
+router.get("/mutual/:targetUserId", requireUser, async (req: any, res) => {
+  try {
 
-      const userId = req.user.id;
-      const { targetUserId } = req.params;
+    const userId = req.user.id;
+    const { targetUserId } = req.params;
 
-      const currentUserInvite = await prisma.invite.findFirst({
-        where: {
-          usedById: userId,
-        },
-      });
+    const currentInvite = await prisma.invite.findFirst({
+      where: { usedById: userId },
+    });
 
-      const targetInvite = await prisma.invite.findFirst({
-        where: {
-          usedById: targetUserId,
-        },
-      });
+    const targetInvite = await prisma.invite.findFirst({
+      where: { usedById: targetUserId },
+    });
 
-      if (!currentUserInvite || !targetInvite) {
-        return res.json({ mutual: false });
-      }
-
-      if (
-        currentUserInvite.invitedById &&
-        currentUserInvite.invitedById === targetInvite.invitedById
-      ) {
-
-        const inviter = await prisma.user.findUnique({
-          where: { id: currentUserInvite.invitedById },
-          select: {
-            name: true,
-            username: true,
-          },
-        });
-
-        return res.json({
-          mutual: true,
-          inviter: inviter?.name || inviter?.username || "A friend",
-        });
-      }
-
+    if (!currentInvite || !targetInvite) {
       return res.json({ mutual: false });
-
-    } catch (err) {
-      console.error("MUTUAL INVITE ERROR:", err);
-      return res.status(500).json({ error: "Server error" });
     }
+
+    if (currentInvite.invitedById === targetInvite.invitedById) {
+
+      const inviter = await prisma.user.findUnique({
+        where: { id: currentInvite.invitedById! },
+        select: { name: true, username: true },
+      });
+
+      return res.json({
+        mutual: true,
+        inviter: inviter?.name || inviter?.username || "A friend",
+      });
+    }
+
+    res.json({ mutual: false });
+
+  } catch (err) {
+    console.error("MUTUAL ERROR:", err);
+    res.status(500).json({});
   }
-);
+});
 
 /**
- * GET /api/invite/:code
+ * Invite landing validation
  */
-router.get("/:code", async (req: Request, res: Response) => {
+router.get("/:code", async (req, res) => {
   try {
-    const { code } = req.params;
 
     const invite = await prisma.invite.findUnique({
-      where: { code },
+      where: { code: req.params.code },
       include: {
         User_Invite_invitedByIdToUser: {
-          select: {
-            username: true,
-            email: true,
-          },
+          select: { username: true, email: true },
         },
       },
     });
 
-    if (!invite) {
-      return res.status(404).json({ reason: "not_found" });
-    }
-
-    if (invite.used) {
-      return res.status(400).json({ reason: "used" });
-    }
+    if (!invite) return res.status(404).json({ reason: "not_found" });
+    if (invite.used) return res.status(400).json({ reason: "used" });
 
     if (invite.expiresAt && invite.expiresAt < new Date()) {
       return res.status(400).json({ reason: "expired" });
     }
 
-    return res.json({
+    res.json({
       premium: invite.premium,
       expiresAt: invite.expiresAt,
-      invitedBy: invite.User_Invite_invitedByIdToUser
-        ? {
-            username: invite.User_Invite_invitedByIdToUser.username,
-            email: invite.User_Invite_invitedByIdToUser.email,
-          }
-        : null,
+      invitedBy: invite.User_Invite_invitedByIdToUser,
     });
 
   } catch (err) {
-    console.error("INVITE FETCH ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({});
   }
 });
 
 /**
- * POST /api/invite/:code/scan
+ * Scan tracking
  */
-router.post("/:code/scan", async (req: Request, res: Response) => {
+router.post("/:code/scan", async (req, res) => {
   try {
 
-    const { code } = req.params;
-
     const invite = await prisma.invite.findUnique({
-      where: { code },
+      where: { code: req.params.code },
     });
 
-    if (!invite) {
-      return res.status(404).json({});
-    }
+    if (!invite) return res.status(404).json({});
 
     await prisma.invite.update({
       where: { id: invite.id },
-      data: {
-        scanCount: { increment: 1 },
-      },
+      data: { scanCount: { increment: 1 } },
     });
 
     await prisma.inviteScan.create({
@@ -239,43 +172,25 @@ router.post("/:code/scan", async (req: Request, res: Response) => {
       },
     });
 
-    return res.json({ success: true });
+    res.json({ success: true });
 
-  } catch (err) {
-    console.error("INVITE SCAN ERROR:", err);
-    return res.status(500).json({});
+  } catch {
+    res.status(500).json({});
   }
 });
 
 /**
- * POST /api/invite
+ * Generate invite
  */
-router.post("/", requireUser, async (req: any, res: Response) => {
+router.post("/", requireUser, async (req: any, res) => {
   try {
 
-    const userId = req.user.id;
-
-    const body = req.body || {};
-    const premium = Boolean(body.premium);
-    const expiresInDays =
-      typeof body.expiresInDays === "number" ? body.expiresInDays : null;
-
     const code = nanoid(8);
-
-    let expiresAt: Date | null = null;
-
-    if (expiresInDays) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
-    }
 
     const invite = await prisma.invite.create({
       data: {
         code,
-        premium,
-        invitedById: userId,
-        expiresAt,
-        used: false,
+        invitedById: req.user.id,
       },
     });
 
@@ -287,17 +202,15 @@ router.post("/", requireUser, async (req: any, res: Response) => {
 
     const inviteLink = `${frontendBase}/invite/${invite.code}`;
 
-    return res.json({
+    res.json({
       id: invite.id,
       code: invite.code,
       inviteLink,
-      premium: invite.premium,
-      expiresAt: invite.expiresAt,
     });
 
   } catch (err) {
-    console.error("INVITE CREATE ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+    console.error(err);
+    res.status(500).json({});
   }
 });
 

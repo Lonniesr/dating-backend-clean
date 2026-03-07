@@ -15,6 +15,7 @@ import cookieParser from "cookie-parser";
 import apiRoutes from "./routes";
 import { registerSockets } from "./sockets";
 import { env } from "./config/env";
+import { updateLastActive } from "./middleware/updateLastActive";
 
 /* =========================
    APP + SERVER
@@ -62,7 +63,6 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
-      // Allow localhost automatically in dev
       if (env.NODE_ENV !== "production") {
         if (
           origin.startsWith("http://localhost") ||
@@ -72,7 +72,6 @@ app.use(
         }
       }
 
-      // Relaxed matching to prevent subtle formatting mismatches
       const allowed = allowedOrigins.some((o) =>
         origin.startsWith(o)
       );
@@ -129,6 +128,12 @@ app.get("/health", (_req: Request, res: Response) => {
     env: env.NODE_ENV,
   });
 });
+
+/* =========================
+   USER ACTIVITY TRACKING
+========================= */
+
+app.use(updateLastActive);
 
 /* =========================
    ROUTES

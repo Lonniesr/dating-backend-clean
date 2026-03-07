@@ -15,7 +15,6 @@ router.get("/", (req: Request, res: Response) => {
 
 /**
  * GET /api/invite/stats
- * Returns invite statistics for the logged in user
  */
 router.get("/stats", requireUser, async (req: any, res: Response) => {
   try {
@@ -47,7 +46,6 @@ router.get("/stats", requireUser, async (req: any, res: Response) => {
 
 /**
  * GET /api/invite/leaderboard
- * Returns top inviters by successful signups
  */
 router.get("/leaderboard", async (_req: Request, res: Response) => {
   try {
@@ -107,8 +105,64 @@ router.get("/leaderboard", async (_req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/invite/mutual/:targetUserId
+ * Finds if two users share the same inviter
+ */
+router.get(
+  "/mutual/:targetUserId",
+  requireUser,
+  async (req: any, res: Response) => {
+    try {
+
+      const userId = req.user.id;
+      const { targetUserId } = req.params;
+
+      const currentUserInvite = await prisma.invite.findFirst({
+        where: {
+          usedById: userId,
+        },
+      });
+
+      const targetInvite = await prisma.invite.findFirst({
+        where: {
+          usedById: targetUserId,
+        },
+      });
+
+      if (!currentUserInvite || !targetInvite) {
+        return res.json({ mutual: false });
+      }
+
+      if (
+        currentUserInvite.invitedById &&
+        currentUserInvite.invitedById === targetInvite.invitedById
+      ) {
+
+        const inviter = await prisma.user.findUnique({
+          where: { id: currentUserInvite.invitedById },
+          select: {
+            name: true,
+            username: true,
+          },
+        });
+
+        return res.json({
+          mutual: true,
+          inviter: inviter?.name || inviter?.username || "A friend",
+        });
+      }
+
+      return res.json({ mutual: false });
+
+    } catch (err) {
+      console.error("MUTUAL INVITE ERROR:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
+/**
  * GET /api/invite/:code
- * Validate invite for landing page
  */
 router.get("/:code", async (req: Request, res: Response) => {
   try {
@@ -157,10 +211,10 @@ router.get("/:code", async (req: Request, res: Response) => {
 
 /**
  * POST /api/invite/:code/scan
- * Tracks QR scans and invite link opens
  */
 router.post("/:code/scan", async (req: Request, res: Response) => {
   try {
+
     const { code } = req.params;
 
     const invite = await prisma.invite.findUnique({
@@ -195,10 +249,10 @@ router.post("/:code/scan", async (req: Request, res: Response) => {
 
 /**
  * POST /api/invite
- * Generate invite
  */
 router.post("/", requireUser, async (req: any, res: Response) => {
   try {
+
     const userId = req.user.id;
 
     const body = req.body || {};

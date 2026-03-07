@@ -46,6 +46,154 @@ router.get("/stats", requireUser, async (req: any, res: Response) => {
 });
 
 /**
+ * GET /api/invite/leaderboard
+ * Returns top inviters by successful signups
+ */
+router.get("/leaderboard", async (_req: Request, res: Response) => {
+  try {
+
+    const invites = await prisma.invite.groupBy({
+      by: ["invitedById"],
+      where: {
+        used: true,
+        invitedById: {
+          not: null,
+        },
+      },
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        _count: {
+          id: "desc",
+        },
+      },
+      take: 10,
+    });
+
+    const userIds = invites
+      .map((i) => i.invitedById)
+      .filter((id): id is string => id !== null);
+
+    const users = await prisma.user.findMany({
+      where: {
+        id: {
+          in: userIds,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        username: true,
+      },
+    });
+
+    const leaderboard = invites.map((entry) => {
+      const user = users.find((u) => u.id === entry.invitedById);
+
+      return {
+        userId: entry.invitedById,
+        name: user?.name || user?.username || "User",
+        invites: entry._count.id,
+      };
+    });
+
+    return res.json({ leaderboard });
+
+  } catch (err) {
+    console.error("INVITE LEADERBOARD ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * GET /api/invite/:code
+ * Validate invite for landing page
+ */
+router.get("/:code", async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+
+    const invite = await prisma.invite.findUnique({
+      where: { code },
+      include: {
+        User_Invite_invitedByIdToUser: {
+          select: {
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!invite) {
+      return res.status(404).json({ reason: "not_found" });
+    }
+
+    if (invite.used) {
+      return res.status(400).json({ reason: "used" });
+    }
+
+    if (invite.expiresAt && invite.expiresAt < new Date()) {
+      return res.status(400).json({ reason: "expired" });
+    }
+
+    return res.json({
+      premium: invite.premium,
+      expiresAt: invite.expiresAt,
+      invitedBy: invite.User_Invite_invitedByIdToUser
+        ? {
+            username: invite.User_Invite_invitedByIdToUser.username,
+            email: invite.User_Invite_invitedByIdToUser.email,
+          }
+        : null,
+    });
+
+  } catch (err) {
+    console.error("INVITE FETCH ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+/**
+ * POST /api/invite/:code/scan
+ * Tracks QR scans and invite link opens
+ */
+router.post("/:code/scan", async (req: Request, res: Response) => {
+  try {
+    const { code } = req.params;
+
+    const invite = await prisma.invite.findUnique({
+      where: { code },
+    });
+
+    if (!invite) {
+      return res.status(404).json({});
+    }
+
+    await prisma.invite.update({
+      where: { id: invite.id },
+      data: {
+        scanCount: { increment: 1 },
+      },
+    });
+
+    await prisma.inviteScan.create({
+      data: {
+        inviteId: invite.id,
+        device: req.headers["user-agent"] || null,
+      },
+    });
+
+    return res.json({ success: true });
+
+  } catch (err) {
+    console.error("INVITE SCAN ERROR:", err);
+    return res.status(500).json({});
+  }
+});
+
+/**
  * POST /api/invite
  * Generate invite
  */

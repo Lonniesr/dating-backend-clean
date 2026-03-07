@@ -14,26 +14,37 @@ model User {
   theme              String?        @default("light")
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
+
   inviteCode         String?
   username           String?
   birthdate          DateTime?
   gender             String?
   name               String?
   onboardingComplete Boolean        @default(false)
+
   photos             String[]       @default([])
   preferences        Json?
   prompts            Json?
+
   role               String         @default("user")
+
   age                Int?
   bio                String?
   birthplace         String?
   location           String?
-  adminFlags         Json?
-  adminNotes         String?
+
+  race               String?
+
+  verified           Boolean        @default(false)
   banned             Boolean        @default(false)
   lastActiveAt       DateTime?
-  verified           Boolean        @default(false)
-  race               String?
+
+  adminFlags         Json?
+  adminNotes         String?
+
+  // ⭐ Super Likes
+  superLikesRemaining Int            @default(3)
+  superLikesResetAt   DateTime?
 
   Admin              Admin?
   conversationsA     Conversation[] @relation("UserAConversations")
@@ -128,20 +139,38 @@ model Match {
 
 model Message {
   id                 String         @id @default(uuid())
+
   senderId           String
   receiverId         String
+
   createdAt          DateTime       @default(now())
+
   text               String?
   audioUrl           String?
   imageUrl           String?
   reaction           String?
+
   read               Boolean        @default(false)
   delivered          Boolean        @default(false)
+
   conversationId     String?
+
+  // reply system
+  replyToId          String?
+  replyTo            Message?       @relation("MessageReply", fields: [replyToId], references: [id])
+  replies            Message[]      @relation("MessageReply")
+
+  // conversation relations
   lastInConversation Conversation[] @relation("LastMessage")
   conversation       Conversation?  @relation(fields: [conversationId], references: [id])
+
+  // user relations
   receiver           User           @relation("ReceivedMessages", fields: [receiverId], references: [id])
   sender             User           @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([receiverId])
 }
 
 model Swipe {

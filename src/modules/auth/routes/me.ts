@@ -16,15 +16,24 @@ router.get("/", requireUser, async (req: any, res) => {
         id: true,
         name: true,
         email: true,
+
+        // ✅ PROFILE
+        bio: true,
+
         birthdate: true,
         gender: true,
         photos: true,
         preferences: true,
         prompts: true,
+
+        // ✅ STATUS
         onboardingComplete: true,
         role: true,
+        verified: true,
+
+        // ✅ METADATA
         createdAt: true,
-        lastActiveAt: true,
+        lastActiveAt: true
       },
     });
 

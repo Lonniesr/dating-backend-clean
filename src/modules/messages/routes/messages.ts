@@ -13,7 +13,6 @@ router.get("/:id", requireUser, async (req: any, res) => {
     const userId = req.user.id;
     const otherId = req.params.id;
 
-    // Ensure users are matched
     const match = await prisma.match.findFirst({
       where: {
         OR: [
@@ -29,7 +28,6 @@ router.get("/:id", requireUser, async (req: any, res) => {
         .json({ message: "You can only message users you matched with." });
     }
 
-    // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
       where: {
         OR: [
@@ -48,14 +46,12 @@ router.get("/:id", requireUser, async (req: any, res) => {
       });
     }
 
-    // Fetch latest 50 messages
     const messages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: "desc" },
       take: 50,
     });
 
-    // Mark unread messages as read
     await prisma.message.updateMany({
       where: {
         conversationId: conversation.id,
@@ -74,19 +70,38 @@ router.get("/:id", requireUser, async (req: any, res) => {
 
 /**
  * POST /api/messages/:id
- * Send a message to a specific user
+ * Send a message
  */
 router.post("/:id", requireUser, async (req: any, res) => {
   try {
     const senderId = req.user.id;
     const receiverId = req.params.id;
-    const { text } = req.body;
 
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ message: "Message cannot be empty." });
+    const { text, imageUrl, audioUrl, replyToId } = req.body;
+
+    const sender = await prisma.user.findUnique({
+      where: { id: senderId },
+      select: { verified: true },
+    });
+
+    if (!sender) {
+      return res.status(401).json({ message: "Unauthorized." });
     }
 
-    // Ensure users are matched
+    // 🔒 block media for unverified users
+    if (!sender.verified && (imageUrl || audioUrl)) {
+      return res.status(403).json({
+        message:
+          "Verify your profile to send photos and voice messages.",
+      });
+    }
+
+    if (!text && !imageUrl && !audioUrl) {
+      return res.status(400).json({
+        message: "Message cannot be empty.",
+      });
+    }
+
     const match = await prisma.match.findFirst({
       where: {
         OR: [
@@ -102,7 +117,6 @@ router.post("/:id", requireUser, async (req: any, res) => {
         .json({ message: "You can only message users you matched with." });
     }
 
-    // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
       where: {
         OR: [
@@ -121,17 +135,18 @@ router.post("/:id", requireUser, async (req: any, res) => {
       });
     }
 
-    // Create message
     const message = await prisma.message.create({
       data: {
         senderId,
         receiverId,
         text,
+        imageUrl,
+        audioUrl,
+        replyToId,
         conversationId: conversation.id,
       },
     });
 
-    // Update conversation
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {

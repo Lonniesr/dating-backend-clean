@@ -5,10 +5,10 @@ import { Router } from "express";
 ========================= */
 
 import authRoutes from "../modules/auth/routes";
-import meRouter from "../modules/auth/routes/me";
 import onboardingRoutes from "../modules/onboarding/routes";
 import matchRoutes from "../modules/match/routes";
 import messageRoutes from "../modules/messages/routes";
+import conversationsRoutes from "../modules/messages/routes/conversations";
 import discoverRoutes from "../modules/discover/routes";
 import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
@@ -18,7 +18,13 @@ import publicInviteRoutes from "../modules/user/routes/public/invite";
 import profileCompletionRoutes from "../modules/user/routes/profileCompletion";
 import matchCountRoutes from "../modules/user/routes/matchCount";
 import statsRoutes from "../modules/user/routes/stats";
-import photosRouter from "../modules/user/routes/photos"; // ✅ correct import path
+import photosRouter from "../modules/user/routes/photos";
+
+/* =========================
+   SETTINGS ROUTES
+========================= */
+
+import settingsRoutes from "../modules/settings/routes";
 
 /* =========================
    ADMIN ROUTES
@@ -44,7 +50,6 @@ const router = Router();
 ========================= */
 
 router.use("/auth", authRoutes);
-router.use("/auth/me", meRouter); // ✅ ensures /api/auth/me
 
 /* =========================
    USER DOMAIN
@@ -52,19 +57,37 @@ router.use("/auth/me", meRouter); // ✅ ensures /api/auth/me
 
 router.use("/onboarding", onboardingRoutes);
 
-// Mount all user sub-routes cleanly under /api/user/*
+// Core user routes
 router.use("/user", userRoutes);
 router.use("/user/photos", photosRouter);
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);
 
+// Public + utilities
 router.use("/invite", publicInviteRoutes);
 router.use("/upload/chat", chatUploadRoute);
+
+/* =========================
+   MATCHING DOMAIN
+========================= */
+
 router.use("/match", matchRoutes);
-router.use("/messages", messageRoutes);
 router.use("/discover", discoverRoutes);
 router.use("/swipe", swipeRoutes);
+
+/* =========================
+   MESSAGING DOMAIN
+========================= */
+
+router.use("/conversations", conversationsRoutes);
+router.use("/messages", messageRoutes);
+
+/* =========================
+   SETTINGS DOMAIN
+========================= */
+
+router.use("/settings", settingsRoutes);
 
 /* =========================
    ADMIN DOMAIN

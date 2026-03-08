@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import prisma from "../prisma";
-import { env } from "../config/env";
+import { env } from "./../config/env";
 
 /* =========================
    AUTH USER TYPE

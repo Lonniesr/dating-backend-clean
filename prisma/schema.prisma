@@ -36,6 +36,11 @@ model User {
   race               String?
 
   verified           Boolean        @default(false)
+
+  // ⭐ ADD THESE
+  verification_status String?       @default("unverified")
+  verification_selfie String?
+
   banned             Boolean        @default(false)
   lastActiveAt       DateTime?
 

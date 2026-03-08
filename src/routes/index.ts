@@ -22,10 +22,11 @@ import statsRoutes from "../modules/user/routes/stats";
 import photosRouter from "../modules/user/routes/photos";
 
 /* =========================
-   VERIFICATION ROUTE
+   VERIFICATION ROUTES
 ========================= */
 
 import verificationRoutes from "../modules/user/routes/verification";
+import selfieVerificationRoutes from "../modules/user/routes/selfieVerification";
 
 /* =========================
    SETTINGS ROUTES
@@ -76,6 +77,7 @@ router.use("/user/swipe-stats", statsRoutes);
 ========================= */
 
 router.use("/user/verify", verificationRoutes);
+router.use("/user/selfie-verification", selfieVerificationRoutes);
 
 /* =========================
    INVITE SYSTEM

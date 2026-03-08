@@ -11,7 +11,7 @@ export async function updateLastActive(
       await prisma.user.update({
         where: { id: req.user.id },
         data: {
-          lastActive: new Date(),
+          lastActiveAt: new Date(),
         },
       });
     }

@@ -11,9 +11,11 @@ const router = Router();
 router.get("/", requireUser, async (req: Request & { user?: any }, res: Response) => {
   try {
     const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    // Get current user with preferences
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -28,79 +30,53 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       return res.status(404).json({ message: "User not found." });
     }
 
-    const preferences = currentUser.preferences as any;
+    const prefs = currentUser.preferences as any;
 
-    // Users this user already swiped on
-    const swipes = await prisma.swipe.findMany({
-      where: { swiperId: userId },
-      select: { targetId: true },
-    });
-
-    const swipedIds = swipes.map((s) => s.targetId);
-
-    // Users already matched
-    const matches = await prisma.match.findMany({
-      where: {
-        OR: [{ userAId: userId }, { userBId: userId }],
-      },
-      select: { userAId: true, userBId: true },
-    });
-
-    const matchedIds = matches
-      .flatMap((m) => [m.userAId, m.userBId])
-      .filter((id) => id !== userId);
-
-    // Age filter calculations
     const today = new Date();
 
     let minBirthdate: Date | undefined;
     let maxBirthdate: Date | undefined;
 
-    if (preferences?.minAge) {
+    if (prefs?.minAge) {
       maxBirthdate = new Date(
-        today.getFullYear() - preferences.minAge,
+        today.getFullYear() - prefs.minAge,
         today.getMonth(),
         today.getDate()
       );
     }
 
-    if (preferences?.maxAge) {
+    if (prefs?.maxAge) {
       minBirthdate = new Date(
-        today.getFullYear() - preferences.maxAge,
+        today.getFullYear() - prefs.maxAge,
         today.getMonth(),
         today.getDate()
       );
     }
 
-    // Base filter
+    /* ---------------- PRIMARY FILTER ---------------- */
+
     const whereClause: any = {
-      id: {
-        not: userId,
-        notIn: [...swipedIds, ...matchedIds],
-      },
+      id: { not: userId },
       onboardingComplete: true,
       banned: false,
     };
 
-    // Gender filter
-    if (preferences?.interestedIn && preferences.interestedIn !== "Everyone") {
+    if (prefs?.interestedIn && prefs.interestedIn !== "Everyone") {
       whereClause.gender =
-        preferences.interestedIn === "Men" ? "male" : "female";
+        prefs.interestedIn === "Men" ? "male" : "female";
     }
 
-    // Race preference filter
-    if (preferences?.racePreference) {
-      whereClause.race = preferences.racePreference;
+    if (prefs?.racePreference) {
+      whereClause.race = prefs.racePreference;
     }
 
-    // Age filter
     if (minBirthdate || maxBirthdate) {
       whereClause.birthdate = {};
       if (minBirthdate) whereClause.birthdate.gte = minBirthdate;
       if (maxBirthdate) whereClause.birthdate.lte = maxBirthdate;
     }
 
-    const candidates = await prisma.user.findMany({
+    let candidates = await prisma.user.findMany({
       where: whereClause,
       select: {
         id: true,
@@ -113,6 +89,32 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       },
       take: 20,
     });
+
+    /* ---------------- FALLBACK IF EMPTY ---------------- */
+
+    if (candidates.length === 0) {
+      console.log("Discover fallback triggered");
+
+      candidates = await prisma.user.findMany({
+        where: {
+          id: { not: userId },
+          onboardingComplete: true,
+          banned: false,
+        },
+        select: {
+          id: true,
+          name: true,
+          gender: true,
+          race: true,
+          photos: true,
+          birthdate: true,
+          location: true,
+        },
+        take: 20,
+      });
+    }
+
+    console.log("DISCOVER candidates:", candidates.length);
 
     res.json(candidates);
   } catch (err) {

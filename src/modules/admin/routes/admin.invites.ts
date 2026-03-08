@@ -14,7 +14,7 @@ router.get("/", requireAdmin, async (_req: Request, res: Response) => {
     const invites = await prisma.invite.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        User_Invite_usedByIdToUser: {
+        usedBy: {
           select: { id: true, name: true, email: true },
         },
       },

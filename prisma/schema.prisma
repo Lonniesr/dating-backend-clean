@@ -8,83 +8,86 @@ datasource db {
 }
 
 model User {
-  id                 String         @id @default(uuid())
-  email              String         @unique
+  id                 String   @id @default(uuid())
+  email              String   @unique
   password           String
-
-  theme              String?        @default("light")
-
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-
   inviteCode         String?
+
+  role               String   @default("user")
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
   username           String?
-
   name               String?
-  gender             String?
   birthdate          DateTime?
-  age                Int?
+  age                Int?        // ✅ ADD BACK
+  theme              String?     // ✅ ADD BACK
 
-  onboardingComplete Boolean        @default(false)
+  gender             String?
+  race               String?
 
   bio                String?
   birthplace         String?
   location           String?
 
-  // 🌍 GEO LOCATION (for distance)
   latitude           Float?
   longitude          Float?
 
-  race               String?
+  photos             String[] @default([])
 
-  photos             String[]       @default([])
   preferences        Json?
   prompts            Json?
 
-  role               String         @default("user")
+  onboardingComplete Boolean  @default(false)
 
-  verified           Boolean        @default(false)
-
-  // 📸 Verification system
-  verification_status String?       @default("unverified")
+  verified           Boolean  @default(false)
+  verification_status String? @default("unverified")
   verification_selfie String?
 
-  banned             Boolean        @default(false)
+  banned             Boolean  @default(false)
+
   lastActiveAt       DateTime?
 
   adminFlags         Json?
   adminNotes         String?
 
-  // ⭐ Super Likes
-  superLikesRemaining Int            @default(3)
+  superLikesRemaining Int     @default(3)
   superLikesResetAt   DateTime?
 
-  // Relations
   Admin              Admin?
 
   conversationsA     Conversation[] @relation("UserAConversations")
   conversationsB     Conversation[] @relation("UserBConversations")
 
-  invitesSent        Invite[]       @relation("Invite_invitedByIdToUser")
-  invitesUsed        Invite[]       @relation("Invite_usedByIdToUser")
+  invitesSent        Invite[] @relation("Invite_invitedByIdToUser")
+  invitesUsed        Invite[] @relation("Invite_usedByIdToUser")
 
-  matchesAsUserA     Match[]        @relation("Match_userA")
-  matchesAsUserB     Match[]        @relation("Match_userB")
+  matchesAsUserA     Match[]  @relation("Match_userA")
+  matchesAsUserB     Match[]  @relation("Match_userB")
 
-  receivedMessages   Message[]      @relation("ReceivedMessages")
-  sentMessages       Message[]      @relation("SentMessages")
+  sentMessages       Message[] @relation("SentMessages")
+  receivedMessages   Message[] @relation("ReceivedMessages")
 
-  swipesGiven        Swipe[]        @relation("Swipe_swiperIdToUser")
-  swipesReceived     Swipe[]        @relation("Swipe_targetIdToUser")
+  swipesGiven        Swipe[] @relation("Swipe_swiperIdToUser")
+  swipesReceived     Swipe[] @relation("Swipe_targetIdToUser")
+
+  @@index([latitude, longitude])
 }
 
 model Admin {
   id        String   @id @default(uuid())
+
   email     String   @unique
   password  String
+
   createdAt DateTime @default(now())
+
   userId    String?  @unique
-  User      User?    @relation(fields: [userId], references: [id])
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([email])
 }
 
 model AdminSettings {
@@ -97,38 +100,54 @@ model AdminSettings {
 }
 
 model Conversation {
-  id            String    @id @default(uuid())
-  userAId       String
-  userBId       String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id String @id @default(uuid())
+
+  userAId String
+  userBId String
+
   lastMessageId String?
-  lastMessage   Message?  @relation("LastMessage", fields: [lastMessageId], references: [id])
-  userA         User      @relation("UserAConversations", fields: [userAId], references: [id])
-  userB         User      @relation("UserBConversations", fields: [userBId], references: [id])
-  messages      Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userA User @relation("UserAConversations", fields: [userAId], references: [id])
+  userB User @relation("UserBConversations", fields: [userBId], references: [id])
+
+  messages Message[]
+
+  lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [id])
+
+  @@index([userAId])
+  @@index([userBId])
 }
 
 model Invite {
-  id                            Int       @id @default(autoincrement())
-  code                          String    @unique
-  createdAt                     DateTime  @default(now())
-  used                          Boolean   @default(false)
-  usedAt                        DateTime?
-  email                         String?
-  usedById                      String?
-  expiresAt                     DateTime?
-  invitedById                   String?
-  premium                       Boolean   @default(false)
+  id         Int      @id @default(autoincrement())
+  code       String   @unique
 
-  // 🔥 Growth Analytics
-  scanCount                     Int       @default(0)
-  signupCount                   Int       @default(0)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
 
-  User_Invite_invitedByIdToUser User?     @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id])
-  User_Invite_usedByIdToUser    User?     @relation("Invite_usedByIdToUser", fields: [usedById], references: [id])
+  email      String?
+  premium    Boolean  @default(false)
 
-  scans                         InviteScan[]
+  used       Boolean  @default(false)
+  usedAt     DateTime?
+
+  invitedById String?
+  usedById    String?
+
+  scanCount   Int @default(0)
+  signupCount Int @default(0)
+
+  invitedBy User? @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id])
+  usedBy    User? @relation("Invite_usedByIdToUser", fields: [usedById], references: [id])
+
+  scans InviteScan[]
+
+  @@index([code])
+  @@index([invitedById])
+  @@index([usedById])
 }
 
 model InviteScan {
@@ -136,7 +155,6 @@ model InviteScan {
   inviteId  Int
   createdAt DateTime @default(now())
 
-  // 🔥 Device Analytics
   device    String?
   browser   String?
   os        String?
@@ -150,42 +168,42 @@ model InviteScan {
 model Match {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
+
   userAId   String
   userBId   String
+
   userA     User     @relation("Match_userA", fields: [userAId], references: [id])
   userB     User     @relation("Match_userB", fields: [userBId], references: [id])
 }
 
 model Message {
-  id                 String         @id @default(uuid())
+  id String @id @default(uuid())
 
-  senderId           String
-  receiverId         String
+  conversationId String
 
-  createdAt          DateTime       @default(now())
+  senderId String
+  receiverId String
 
-  text               String?
-  audioUrl           String?
-  imageUrl           String?
-  reaction           String?
+  text String?
 
-  read               Boolean        @default(false)
-  delivered          Boolean        @default(false)
+  imageUrl String?
+  audioUrl String?
 
-  conversationId     String?
+  replyToId String?
 
-  // reply system
-  replyToId          String?
-  replyTo            Message?       @relation("MessageReply", fields: [replyToId], references: [id])
-  replies            Message[]      @relation("MessageReply")
+  read Boolean @default(false)
 
-  // conversation relations
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  sender User @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  replyTo Message? @relation("MessageReply", fields: [replyToId], references: [id])
+  replies Message[] @relation("MessageReply")
+
   lastInConversation Conversation[] @relation("LastMessage")
-  conversation       Conversation?  @relation(fields: [conversationId], references: [id])
-
-  // user relations
-  receiver           User           @relation("ReceivedMessages", fields: [receiverId], references: [id])
-  sender             User           @relation("SentMessages", fields: [senderId], references: [id])
 
   @@index([conversationId])
   @@index([senderId])
@@ -193,14 +211,20 @@ model Message {
 }
 
 model Swipe {
-  id                        String   @id @default(uuid())
-  swiperId                  String
-  targetId                  String
-  direction                 String
-  createdAt                 DateTime @default(now())
+  id        String   @id @default(uuid())
 
-  User_Swipe_swiperIdToUser User     @relation("Swipe_swiperIdToUser", fields: [swiperId], references: [id])
-  User_Swipe_targetIdToUser User     @relation("Swipe_targetIdToUser", fields: [targetId], references: [id])
+  swiperId  String
+  targetId  String
+
+  liked     Boolean
+  superLike Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  swiper User @relation("Swipe_swiperIdToUser", fields: [swiperId], references: [id])
+  target User @relation("Swipe_targetIdToUser", fields: [targetId], references: [id])
 
   @@unique([swiperId, targetId])
+  @@index([swiperId])
+  @@index([targetId])
 }

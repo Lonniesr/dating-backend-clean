@@ -35,6 +35,7 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       where: { swiperId: userId },
       select: { targetId: true },
     });
+
     const swipedIds = swipes.map((s) => s.targetId);
 
     // Users already matched
@@ -49,7 +50,7 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       .flatMap((m) => [m.userAId, m.userBId])
       .filter((id) => id !== userId);
 
-    // Calculate birthdate boundaries for age filter
+    // Age filter calculations
     const today = new Date();
 
     let minBirthdate: Date | undefined;
@@ -71,14 +72,14 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       );
     }
 
-    // Build dynamic where clause
+    // Base filter
     const whereClause: any = {
       id: {
         not: userId,
         notIn: [...swipedIds, ...matchedIds],
       },
       onboardingComplete: true,
-      photos: { isEmpty: false },
+      banned: false,
     };
 
     // Gender filter

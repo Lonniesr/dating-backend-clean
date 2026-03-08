@@ -1,9 +1,3 @@
-import { Router } from "express";
+import discoverRoute from "./discover";
 
-const router = Router();
-
-router.get("/", (req, res) => {
-  res.json({ message: "Discover routes working" });
-});
-
-export default router;
+export default discoverRoute;

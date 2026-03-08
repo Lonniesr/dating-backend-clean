@@ -16,6 +16,8 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    console.log("DISCOVER request from user:", userId);
+
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -31,6 +33,8 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
     }
 
     const prefs = currentUser.preferences as any;
+
+    console.log("DISCOVER preferences:", prefs);
 
     const today = new Date();
 
@@ -53,8 +57,6 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       );
     }
 
-    /* ---------------- PRIMARY FILTER ---------------- */
-
     const whereClause: any = {
       id: { not: userId },
       onboardingComplete: true,
@@ -76,6 +78,8 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       if (maxBirthdate) whereClause.birthdate.lte = maxBirthdate;
     }
 
+    console.log("DISCOVER where clause:", whereClause);
+
     let candidates = await prisma.user.findMany({
       where: whereClause,
       select: {
@@ -90,10 +94,10 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
       take: 20,
     });
 
-    /* ---------------- FALLBACK IF EMPTY ---------------- */
+    console.log("DISCOVER candidates found:", candidates.length);
 
     if (candidates.length === 0) {
-      console.log("Discover fallback triggered");
+      console.log("DISCOVER fallback triggered");
 
       candidates = await prisma.user.findMany({
         where: {
@@ -112,11 +116,12 @@ router.get("/", requireUser, async (req: Request & { user?: any }, res: Response
         },
         take: 20,
       });
+
+      console.log("DISCOVER fallback candidates:", candidates.length);
     }
 
-    console.log("DISCOVER candidates:", candidates.length);
-
     res.json(candidates);
+
   } catch (err) {
     console.error("DISCOVER ERROR:", err);
     res.status(500).json({ message: "Failed to load discover feed." });

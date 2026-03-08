@@ -11,16 +11,31 @@ model User {
   id                 String         @id @default(uuid())
   email              String         @unique
   password           String
+
   theme              String?        @default("light")
+
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
   inviteCode         String?
   username           String?
-  birthdate          DateTime?
-  gender             String?
+
   name               String?
+  gender             String?
+  birthdate          DateTime?
+  age                Int?
+
   onboardingComplete Boolean        @default(false)
+
+  bio                String?
+  birthplace         String?
+  location           String?
+
+  // 🌍 GEO LOCATION (for distance)
+  latitude           Float?
+  longitude          Float?
+
+  race               String?
 
   photos             String[]       @default([])
   preferences        Json?
@@ -28,16 +43,9 @@ model User {
 
   role               String         @default("user")
 
-  age                Int?
-  bio                String?
-  birthplace         String?
-  location           String?
-
-  race               String?
-
   verified           Boolean        @default(false)
 
-  // ⭐ ADD THESE
+  // 📸 Verification system
   verification_status String?       @default("unverified")
   verification_selfie String?
 
@@ -51,15 +59,21 @@ model User {
   superLikesRemaining Int            @default(3)
   superLikesResetAt   DateTime?
 
+  // Relations
   Admin              Admin?
+
   conversationsA     Conversation[] @relation("UserAConversations")
   conversationsB     Conversation[] @relation("UserBConversations")
+
   invitesSent        Invite[]       @relation("Invite_invitedByIdToUser")
   invitesUsed        Invite[]       @relation("Invite_usedByIdToUser")
+
   matchesAsUserA     Match[]        @relation("Match_userA")
   matchesAsUserB     Match[]        @relation("Match_userB")
+
   receivedMessages   Message[]      @relation("ReceivedMessages")
   sentMessages       Message[]      @relation("SentMessages")
+
   swipesGiven        Swipe[]        @relation("Swipe_swiperIdToUser")
   swipesReceived     Swipe[]        @relation("Swipe_targetIdToUser")
 }

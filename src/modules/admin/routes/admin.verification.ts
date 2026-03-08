@@ -43,7 +43,7 @@ router.get("/", requireAdmin, async (_req, res) => {
  */
 router.post("/:userId/approve", requireAdmin, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
 
     await prisma.user.update({
       where: { id: userId },
@@ -69,7 +69,7 @@ router.post("/:userId/approve", requireAdmin, async (req, res) => {
  */
 router.post("/:userId/reject", requireAdmin, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
 
     await prisma.user.update({
       where: { id: userId },

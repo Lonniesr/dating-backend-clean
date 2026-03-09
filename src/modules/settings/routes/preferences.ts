@@ -6,7 +6,7 @@ const router = Router();
 
 /**
  * PUT /api/settings/preferences
- * Update dating preferences from settings page
+ * Update dating preferences
  */
 router.put("/", requireUser, async (req: Request, res: Response) => {
   try {
@@ -25,7 +25,7 @@ router.put("/", requireUser, async (req: Request, res: Response) => {
     } = req.body;
 
     /* ===============================
-       LOAD EXISTING PREFERENCES
+       LOAD CURRENT PREFERENCES
     =============================== */
 
     const currentUser = await prisma.user.findUnique({
@@ -44,20 +44,33 @@ router.put("/", requireUser, async (req: Request, res: Response) => {
         : {};
 
     /* ===============================
+       BUILD UPDATED OBJECT
+    =============================== */
+
+    const updatedPreferences = {
+      ...existingPreferences,
+
+      ...(interestedIn !== undefined && { interestedIn }),
+
+      ...(minAge !== undefined && { minAge: Number(minAge) }),
+
+      ...(maxAge !== undefined && { maxAge: Number(maxAge) }),
+
+      ...(racePreference !== undefined && { racePreference }),
+
+      ...(locationRadius !== undefined && {
+        locationRadius: Number(locationRadius),
+      }),
+    };
+
+    /* ===============================
        UPDATE USER
     =============================== */
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        preferences: {
-          ...existingPreferences,
-          interestedIn,
-          minAge,
-          maxAge,
-          racePreference,
-          locationRadius,
-        },
+        preferences: updatedPreferences,
       },
       select: {
         id: true,

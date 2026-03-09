@@ -6,7 +6,7 @@ const router = Router();
 
 /**
  * GET /api/profile
- * Returns the authenticated user's profile
+ * Returns authenticated user profile
  */
 router.get(
   "/",
@@ -29,7 +29,10 @@ router.get(
 
           name: true,
           username: true,
+
           birthdate: true,
+          age: true,
+
           gender: true,
           race: true,
 
@@ -41,8 +44,8 @@ router.get(
           longitude: true,
 
           photos: true,
-          prompts: true,
 
+          prompts: true,
           preferences: true,
 
           verified: true,
@@ -57,7 +60,17 @@ router.get(
         return res.status(404).json({ error: "Profile not found" });
       }
 
-      return res.json(profile);
+      /**
+       * Safety layer to avoid frontend crashes
+       */
+      const safeProfile = {
+        ...profile,
+        photos: profile.photos || [],
+        prompts: profile.prompts || {},
+        preferences: profile.preferences || {},
+      };
+
+      return res.json(safeProfile);
     } catch (err) {
       console.error("PROFILE FETCH ERROR:", err);
 
@@ -94,18 +107,23 @@ router.post(
         });
       }
 
-      await prisma.user.update({
+      const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
           latitude: lat,
           longitude: lon,
         },
+        select: {
+          latitude: true,
+          longitude: true,
+        },
       });
 
       return res.json({
         success: true,
-        message: "Location saved",
+        location: updatedUser,
       });
+
     } catch (err) {
       console.error("LOCATION SAVE ERROR:", err);
 

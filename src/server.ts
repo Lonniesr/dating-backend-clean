@@ -50,7 +50,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   CORS (PRODUCTION SAFE)
+   CORS (FIXED FOR LOCAL + PROD)
 ========================= */
 
 const allowedOrigins = (env.CORS_ORIGIN || "")
@@ -63,15 +63,15 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
-      if (env.NODE_ENV !== "production") {
-        if (
-          origin.startsWith("http://localhost") ||
-          origin.startsWith("http://127.0.0.1")
-        ) {
-          return callback(null, true);
-        }
+      /* Always allow localhost for development */
+      if (
+        origin.startsWith("http://localhost") ||
+        origin.startsWith("http://127.0.0.1")
+      ) {
+        return callback(null, true);
       }
 
+      /* Allow production domains */
       const allowed = allowedOrigins.some((o) =>
         origin.startsWith(o)
       );

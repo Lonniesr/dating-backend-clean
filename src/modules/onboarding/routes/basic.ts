@@ -4,9 +4,11 @@ import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-router.post("/", requireUser, async (req: Request, res: Response) => {
+router.post("/", requireUser, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!req.user || !req.user.id) {
+    const userId = req.user?.id;
+
+    if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -15,11 +17,15 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       birthdate,
       gender,
       race,
+      bio,
       birthplace,
-      location,
+      latitude,
+      longitude,
     } = req.body;
 
-    // ----- Validation -----
+    /* =========================
+       VALIDATION
+    ========================= */
 
     if (!name || !birthdate || !gender || !race) {
       return res.status(400).json({
@@ -51,17 +57,23 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       });
     }
 
+    /* =========================
+       UPDATE USER
+    ========================= */
+
     const updatedUser = await prisma.user.update({
-      where: { id: req.user.id },
+      where: { id: userId },
       data: {
         name: name.trim(),
         birthdate: parsedBirthdate,
         gender,
         race,
 
-        // newly supported fields
+        bio: bio ? bio.trim() : null,
         birthplace: birthplace ? birthplace.trim() : null,
-        location: location ? location.trim() : null,
+
+        latitude: latitude ? Number(latitude) : null,
+        longitude: longitude ? Number(longitude) : null,
       },
     });
 

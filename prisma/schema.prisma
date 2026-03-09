@@ -21,8 +21,8 @@ model User {
   username           String?
   name               String?
   birthdate          DateTime?
-  age                Int?        // ✅ ADD BACK
-  theme              String?     // ✅ ADD BACK
+  age                Int?
+  theme              String?
 
   gender             String?
   race               String?
@@ -33,8 +33,6 @@ model User {
 
   latitude           Float?
   longitude          Float?
-
-  photos             String[] @default([])
 
   preferences        Json?
   prompts            Json?
@@ -72,7 +70,21 @@ model User {
   swipesGiven        Swipe[] @relation("Swipe_swiperIdToUser")
   swipesReceived     Swipe[] @relation("Swipe_targetIdToUser")
 
+  photos             Photo[]   // ✅ NEW RELATION
+
   @@index([latitude, longitude])
+}
+
+model Photo {
+  id        String   @id @default(uuid())
+  userId    String
+  url       String
+  order     Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Admin {

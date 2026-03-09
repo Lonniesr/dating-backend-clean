@@ -9,7 +9,8 @@ router.get("/", requireUser, async (req: any, res) => {
     const userId = req.user.id;
 
     const user = await prisma.user.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      include: { photos: true },
     });
 
     if (!user) {
@@ -19,15 +20,14 @@ router.get("/", requireUser, async (req: any, res) => {
     const personalityComplete =
       Array.isArray(user.prompts) && user.prompts.length > 0;
 
-    const photosComplete =
-      Array.isArray(user.photos) && user.photos.length >= 1;
+    const photosComplete = user.photos.length >= 1;
 
     const checks = {
       name: !!user.name,
       gender: !!user.gender,
       preferences: !!user.preferences,
       personality: personalityComplete,
-      photos: photosComplete
+      photos: photosComplete,
     };
 
     const total = Object.keys(checks).length;
@@ -37,9 +37,8 @@ router.get("/", requireUser, async (req: any, res) => {
 
     return res.json({
       percent,
-      checks
+      checks,
     });
-
   } catch (err) {
     console.error("PROFILE COMPLETION ERROR:", err);
     return res.status(500).json({ error: "Server error" });

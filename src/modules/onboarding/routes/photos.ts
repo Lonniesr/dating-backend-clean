@@ -54,25 +54,29 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
     }
 
     /* ==============================
-       UPDATE USER
+       SAVE PHOTOS
     ============================== */
 
-    const updatedUser = await prisma.user.update({
+    // delete existing photos
+    await prisma.photo.deleteMany({
+      where: { userId },
+    });
+
+    // create new photos
+    await prisma.photo.createMany({
+      data: cleanedPhotos.map((url: string, index: number) => ({
+        userId,
+        url,
+        order: index,
+      })),
+    });
+
+    const updatedUser = await prisma.user.findUnique({
       where: { id: userId },
-      data: {
+      include: {
         photos: {
-          set: cleanedPhotos,
+          orderBy: { order: "asc" },
         },
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        gender: true,
-        photos: true,
-        onboardingComplete: true,
-        createdAt: true,
-        updatedAt: true,
       },
     });
 

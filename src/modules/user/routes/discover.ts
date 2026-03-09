@@ -4,10 +4,6 @@ import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-/**
- * GET /api/discover
- * Returns swipe candidates for the logged-in user
- */
 router.get("/", requireUser, async (req, res) => {
   try {
     if (!req.user) {
@@ -16,7 +12,6 @@ router.get("/", requireUser, async (req, res) => {
 
     const userId = req.user.id;
 
-    // Fetch current user (for preferences)
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -35,7 +30,6 @@ router.get("/", requireUser, async (req, res) => {
         ? JSON.parse(currentUser.preferences)
         : currentUser.preferences;
 
-    // -------- USERS ALREADY SWIPED --------
     const swipes = await prisma.swipe.findMany({
       where: { swiperId: userId },
       select: { targetId: true },
@@ -43,7 +37,6 @@ router.get("/", requireUser, async (req, res) => {
 
     const swipedIds = swipes.map((s) => s.targetId);
 
-    // -------- USERS ALREADY MATCHED --------
     const matches = await prisma.match.findMany({
       where: {
         OR: [{ userAId: userId }, { userBId: userId }],
@@ -55,7 +48,6 @@ router.get("/", requireUser, async (req, res) => {
       .flatMap((m) => [m.userAId, m.userBId])
       .filter((id) => id !== userId);
 
-    // -------- AGE FILTER --------
     let minBirthdate: Date | undefined;
     let maxBirthdate: Date | undefined;
 
@@ -71,7 +63,6 @@ router.get("/", requireUser, async (req, res) => {
       minBirthdate = d;
     }
 
-    // -------- DISCOVER QUERY --------
     const candidates = await prisma.user.findMany({
       where: {
         id: {
@@ -82,15 +73,13 @@ router.get("/", requireUser, async (req, res) => {
         onboardingComplete: true,
 
         photos: {
-          isEmpty: false,
+          some: {},
         },
 
-        // gender preference
         ...(prefs?.interestedIn && prefs.interestedIn !== "everyone"
           ? { gender: prefs.interestedIn }
           : {}),
 
-        // age filter
         ...(minBirthdate || maxBirthdate
           ? {
               birthdate: {
@@ -105,10 +94,13 @@ router.get("/", requireUser, async (req, res) => {
         id: true,
         name: true,
         gender: true,
-        photos: true,
         birthdate: true,
         location: true,
         bio: true,
+        photos: {
+          orderBy: { order: "asc" },
+          select: { url: true },
+        },
       },
 
       take: 20,
@@ -116,7 +108,10 @@ router.get("/", requireUser, async (req, res) => {
 
     res.json({
       success: true,
-      results: candidates,
+      results: candidates.map((c) => ({
+        ...c,
+        photos: c.photos.map((p) => p.url),
+      })),
     });
   } catch (err) {
     console.error("DISCOVER ERROR:", err);

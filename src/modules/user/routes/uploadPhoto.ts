@@ -3,12 +3,11 @@ import prisma from "../../../prisma";
 
 export default async function uploadPhoto(req: Request, res: Response) {
   try {
-    // ✅ Type-safe auth guard
-    if (!req.user) {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-
-    const userId = req.user.id;
 
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -16,19 +15,26 @@ export default async function uploadPhoto(req: Request, res: Response) {
 
     const filePath = `/uploads/photos/${req.file.filename}`;
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
+    const count = await prisma.photo.count({
+      where: { userId },
+    });
+
+    await prisma.photo.create({
       data: {
-        photos: {
-          push: filePath,
-        },
-      },
-      select: {
-        photos: true,
+        url: filePath,
+        order: count,
+        userId,
       },
     });
 
-    return res.json({ photos: updated.photos });
+    const photos = await prisma.photo.findMany({
+      where: { userId },
+      orderBy: { order: "asc" },
+    });
+
+    return res.json({
+      photos: photos.map((p) => p.url),
+    });
   } catch (err) {
     console.error("UPLOAD PHOTO ERROR:", err);
     return res.status(500).json({ error: "Server error" });

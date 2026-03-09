@@ -17,8 +17,22 @@ router.get("/", requireUser, async (req: any, res: Response) => {
         OR: [{ userAId: userId }, { userBId: userId }],
       },
       include: {
-        userA: true,
-        userB: true,
+        userA: {
+          include: {
+            photos: {
+              orderBy: { order: "asc" },
+              take: 1,
+            },
+          },
+        },
+        userB: {
+          include: {
+            photos: {
+              orderBy: { order: "asc" },
+              take: 1,
+            },
+          },
+        },
         lastMessage: true,
       },
       orderBy: {
@@ -43,9 +57,7 @@ router.get("/", requireUser, async (req: any, res: Response) => {
           user: {
             id: other.id,
             name: other.name,
-            avatar: Array.isArray(other.photos)
-              ? other.photos[0] ?? null
-              : null,
+            avatar: other.photos?.[0]?.url ?? null,
             online: false,
           },
           lastMessage: c.lastMessage

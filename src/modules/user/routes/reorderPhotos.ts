@@ -3,7 +3,6 @@ import prisma from "../../../prisma";
 
 export default async function reorderPhotos(req: Request, res: Response) {
   try {
-    // ✅ Type-safe auth guard
     if (!req.user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -15,13 +14,24 @@ export default async function reorderPhotos(req: Request, res: Response) {
       return res.status(400).json({ error: "Invalid photo order" });
     }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { photos: newOrder },
-      select: { photos: true },
+    await Promise.all(
+      newOrder.map((photoId: string, index: number) =>
+        prisma.photo.update({
+          where: { id: photoId },
+          data: { order: index },
+        })
+      )
+    );
+
+    const photos = await prisma.photo.findMany({
+      where: { userId },
+      orderBy: { order: "asc" },
+      select: { url: true },
     });
 
-    return res.json({ photos: updated.photos });
+    return res.json({
+      photos: photos.map((p) => p.url),
+    });
   } catch (err) {
     console.error("REORDER PHOTO ERROR:", err);
     return res.status(500).json({ error: "Server error" });

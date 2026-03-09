@@ -1,31 +1,69 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-router.put("/", requireUser, async (req, res) => {
+/**
+ * PUT /api/settings/notifications
+ * Updates notification preferences
+ */
+router.put("/", requireUser, async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
+    if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { push, email } = req.body;
+    const userId = req.user.id;
 
-    const updated = await prisma.user.update({
-      where: { id: req.user.id },
+    const {
+      messageNotifications,
+      matchNotifications,
+      marketingNotifications,
+    } = req.body;
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const existingPreferences =
+      currentUser.preferences &&
+      typeof currentUser.preferences === "object"
+        ? (currentUser.preferences as Record<string, any>)
+        : {};
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
       data: {
         preferences: {
-          ...(req.user.preferences ?? {}),
-          notifications: { push, email },
+          ...existingPreferences,
+          messageNotifications,
+          matchNotifications,
+          marketingNotifications,
         },
+      },
+      select: {
+        id: true,
+        preferences: true,
       },
     });
 
-    return res.json({ success: true, user: updated });
+    return res.json({
+      success: true,
+      preferences: updatedUser.preferences,
+    });
+
   } catch (err) {
     console.error("UPDATE NOTIFICATIONS ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 });
 

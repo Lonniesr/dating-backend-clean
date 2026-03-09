@@ -5,6 +5,29 @@ import { requireUser } from "../../../middleware/requireUser";
 const router = Router();
 
 /**
+ * Distance calculator (miles)
+ */
+function calculateDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) {
+  const R = 3958.8;
+
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+/**
  * GET /api/discover
  * Returns swipe candidates
  */
@@ -20,7 +43,7 @@ router.get(
       }
 
       /**
-       * Get current user
+       * Current user
        */
       const currentUser = await prisma.user.findUnique({
         where: { id: userId },
@@ -37,10 +60,14 @@ router.get(
         return res.status(404).json({ message: "User not found." });
       }
 
-      const prefs = currentUser.preferences as any;
+      const prefs =
+        currentUser.preferences &&
+        typeof currentUser.preferences === "object"
+          ? (currentUser.preferences as any)
+          : {};
 
       /**
-       * Users already swiped
+       * Swiped users
        */
       const swipes = await prisma.swipe.findMany({
         where: { swiperId: userId },
@@ -50,7 +77,7 @@ router.get(
       const swipedIds = swipes.map((s) => s.targetId);
 
       /**
-       * Users already matched
+       * Matched users
        */
       const matches = await prisma.match.findMany({
         where: {
@@ -74,7 +101,7 @@ router.get(
       let minBirthdate: Date | undefined;
       let maxBirthdate: Date | undefined;
 
-      if (prefs?.minAge) {
+      if (prefs.minAge) {
         maxBirthdate = new Date(
           today.getFullYear() - prefs.minAge,
           today.getMonth(),
@@ -82,7 +109,7 @@ router.get(
         );
       }
 
-      if (prefs?.maxAge) {
+      if (prefs.maxAge) {
         minBirthdate = new Date(
           today.getFullYear() - prefs.maxAge,
           today.getMonth(),
@@ -91,7 +118,7 @@ router.get(
       }
 
       /**
-       * Base discover filter
+       * Base query
        */
       const whereClause: any = {
         id: {
@@ -108,11 +135,18 @@ router.get(
       };
 
       /**
-       * Gender preference
+       * Gender filter
        */
-      if (prefs?.interestedIn && prefs.interestedIn !== "Everyone") {
+      if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
         whereClause.gender =
           prefs.interestedIn === "Men" ? "male" : "female";
+      }
+
+      /**
+       * Race preference
+       */
+      if (prefs.racePreference && prefs.racePreference !== "Everyone") {
+        whereClause.race = prefs.racePreference;
       }
 
       /**
@@ -126,7 +160,7 @@ router.get(
       }
 
       /**
-       * Discover candidates
+       * Initial candidate pool
        */
       const candidates = await prisma.user.findMany({
         where: whereClause,
@@ -135,6 +169,7 @@ router.get(
           id: true,
           name: true,
           gender: true,
+          race: true,
           photos: true,
           birthdate: true,
           location: true,
@@ -143,14 +178,37 @@ router.get(
           lastActiveAt: true,
         },
 
-        take: 30,
+        take: 60,
       });
 
       /**
-       * Basic activity ranking
-       * (recently active users appear first)
+       * Radius filtering
        */
-      const ranked = candidates.sort((a, b) => {
+      let filtered = candidates;
+
+      if (
+        prefs.locationRadius &&
+        currentUser.latitude &&
+        currentUser.longitude
+      ) {
+        filtered = candidates.filter((user) => {
+          if (!user.latitude || !user.longitude) return false;
+
+          const distance = calculateDistance(
+            currentUser.latitude!,
+            currentUser.longitude!,
+            user.latitude,
+            user.longitude
+          );
+
+          return distance <= prefs.locationRadius;
+        });
+      }
+
+      /**
+       * Activity ranking
+       */
+      const ranked = filtered.sort((a, b) => {
         const aTime = a.lastActiveAt
           ? new Date(a.lastActiveAt).getTime()
           : 0;
@@ -162,7 +220,7 @@ router.get(
         return bTime - aTime;
       });
 
-      res.json(ranked);
+      res.json(ranked.slice(0, 30));
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
 

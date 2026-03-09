@@ -58,6 +58,18 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
     }
 
     /* =========================
+       AGE CALCULATION
+    ========================= */
+
+    const today = new Date();
+    let age = today.getFullYear() - parsedBirthdate.getFullYear();
+    const m = today.getMonth() - parsedBirthdate.getMonth();
+
+    if (m < 0 || (m === 0 && today.getDate() < parsedBirthdate.getDate())) {
+      age--;
+    }
+
+    /* =========================
        UPDATE USER
     ========================= */
 
@@ -66,18 +78,40 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       data: {
         name: name.trim(),
         birthdate: parsedBirthdate,
+        age,
+
         gender,
         race,
 
-        bio: bio ? bio.trim() : null,
-        birthplace: birthplace ? birthplace.trim() : null,
+        bio: bio?.trim() || null,
+        birthplace: birthplace?.trim() || null,
 
-        latitude: latitude ? Number(latitude) : null,
-        longitude: longitude ? Number(longitude) : null,
+        latitude:
+          latitude !== undefined && latitude !== null
+            ? Number(latitude)
+            : null,
+
+        longitude:
+          longitude !== undefined && longitude !== null
+            ? Number(longitude)
+            : null,
+      },
+      select: {
+        id: true,
+        name: true,
+        birthdate: true,
+        age: true,
+        gender: true,
+        race: true,
+        bio: true,
+        birthplace: true,
+        latitude: true,
+        longitude: true,
       },
     });
 
     return res.status(200).json({
+      success: true,
       user: updatedUser,
     });
 

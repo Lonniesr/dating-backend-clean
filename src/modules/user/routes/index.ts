@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { requireUser } from "../../../middleware/requireUser";   // ✅ FIXED
-import prisma from "../../../prisma";                    // ✅ FIXED (even if unused)
+import { requireUser } from "../../../middleware/requireUser";
+import prisma from "../../../prisma";
 
 // Controllers
 import updateProfile from "./updateProfile";
-import editProfile from "./editProfile";                 
+import editProfile from "./editProfile";
 import deletePhoto from "./deletePhoto";
 import reorderPhotos from "./reorderPhotos";
 import swipeStats from "../../swipe/routes/swipeStats";
@@ -18,6 +18,9 @@ const router = Router();
  * PROFILE
  */
 router.get("/edit", requireUser, editProfile);
+
+/* Allow both routes so frontend works */
+router.put("/profile", requireUser, updateProfile);
 router.put("/update", requireUser, updateProfile);
 
 /**

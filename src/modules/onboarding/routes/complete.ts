@@ -1,23 +1,42 @@
-import { Router } from "express";
-import prisma from "../../../prisma";                    // FIXED
+import { Router, Request, Response } from "express";
+import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
+
 const router = Router();
 
-router.post("/", requireUser, async (req: any, res) => {
+/**
+ * POST /api/onboarding/complete
+ * Marks onboarding as finished
+ */
+router.post("/", requireUser, async (req: Request, res: Response) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const userId = req.user.id;
 
-    const updated = await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { onboardingComplete: true },
+      data: {
+        onboardingComplete: true,
+      },
+      select: {
+        id: true,
+        onboardingComplete: true,
+      },
     });
 
     return res.json({
-      user: updated,
+      success: true,
+      user: updatedUser,
     });
   } catch (err) {
     console.error("ONBOARDING /complete ERROR:", err);
-    return res.status(500).json({ error: "Failed to complete onboarding" });
+
+    return res.status(500).json({
+      error: "Failed to complete onboarding",
+    });
   }
 });
 

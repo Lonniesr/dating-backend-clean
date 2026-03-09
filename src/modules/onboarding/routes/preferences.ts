@@ -4,16 +4,16 @@ import prisma from "../../../prisma";
 
 const router = Router();
 
-router.post("/", requireUser, async (req: any, res: Response) => {
+router.post("/", requireUser, async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
+    if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    const userId = req.user.id;
     const { preferences } = req.body;
 
-    if (!preferences) {
+    if (!preferences || typeof preferences !== "object") {
       return res.status(400).json({ error: "Preferences required" });
     }
 
@@ -30,7 +30,9 @@ router.post("/", requireUser, async (req: any, res: Response) => {
     ============================== */
 
     if (!interestedIn || typeof interestedIn !== "string") {
-      return res.status(400).json({ error: "InterestedIn is required" });
+      return res.status(400).json({
+        error: "interestedIn is required",
+      });
     }
 
     minAge = Number(minAge);
@@ -43,10 +45,11 @@ router.post("/", requireUser, async (req: any, res: Response) => {
       maxAge > 100 ||
       minAge >= maxAge
     ) {
-      return res.status(400).json({ error: "Invalid age range" });
+      return res.status(400).json({
+        error: "Invalid age range",
+      });
     }
 
-    // Allow null radius (means "any")
     if (locationRadius !== null && locationRadius !== undefined) {
       locationRadius = Number(locationRadius);
 
@@ -55,14 +58,16 @@ router.post("/", requireUser, async (req: any, res: Response) => {
         locationRadius < 5 ||
         locationRadius > 100
       ) {
-        return res.status(400).json({ error: "Invalid location radius" });
+        return res.status(400).json({
+          error: "Invalid location radius",
+        });
       }
     } else {
       locationRadius = null;
     }
 
     /* ==============================
-       FETCH CURRENT USER (SAFE MERGE)
+       LOAD EXISTING PREFERENCES
     ============================== */
 
     const currentUser = await prisma.user.findUnique({
@@ -71,13 +76,15 @@ router.post("/", requireUser, async (req: any, res: Response) => {
     });
 
     if (!currentUser) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({
+        error: "User not found",
+      });
     }
 
     const existingPreferences =
-      typeof currentUser.preferences === "object" &&
-      currentUser.preferences !== null
-        ? currentUser.preferences
+      currentUser.preferences &&
+      typeof currentUser.preferences === "object"
+        ? (currentUser.preferences as Record<string, any>)
         : {};
 
     /* ==============================
@@ -102,9 +109,13 @@ router.post("/", requireUser, async (req: any, res: Response) => {
       },
     });
 
-    return res.json({ user: updatedUser });
+    return res.json({
+      user: updatedUser,
+    });
+
   } catch (err) {
     console.error("PREFERENCES UPDATE ERROR:", err);
+
     return res.status(500).json({
       error: "Failed to update preferences",
     });

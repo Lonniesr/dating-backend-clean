@@ -10,9 +10,17 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { name, birthdate, gender, race } = req.body;
+    const {
+      name,
+      birthdate,
+      gender,
+      race,
+      birthplace,
+      location,
+    } = req.body;
 
     // ----- Validation -----
+
     if (!name || !birthdate || !gender || !race) {
       return res.status(400).json({
         message: "Name, birthdate, gender, and race are required.",
@@ -35,21 +43,35 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       });
     }
 
+    const parsedBirthdate = new Date(birthdate);
+
+    if (isNaN(parsedBirthdate.getTime())) {
+      return res.status(400).json({
+        message: "Invalid birthdate format.",
+      });
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: {
         name: name.trim(),
-        birthdate: new Date(birthdate),
+        birthdate: parsedBirthdate,
         gender,
         race,
+
+        // newly supported fields
+        birthplace: birthplace ? birthplace.trim() : null,
+        location: location ? location.trim() : null,
       },
     });
 
     return res.status(200).json({
       user: updatedUser,
     });
+
   } catch (error) {
     console.error("ONBOARDING BASIC ERROR:", error);
+
     return res.status(500).json({
       error: "Failed to update basic info",
     });

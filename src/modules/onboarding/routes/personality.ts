@@ -1,25 +1,55 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { requireUser } from "../../../middleware/requireUser";
-import prisma from "../../../prisma";                    // FIXED
+import prisma from "../../../prisma";
 
 const router = Router();
 
-router.post("/", requireUser, async (req: any, res) => {
+/**
+ * POST /api/onboarding/personality
+ * Saves user bio + personality prompts
+ */
+router.post("/", requireUser, async (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
-    const { prompts } = req.body;
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    const updated = await prisma.user.update({
+    const userId = req.user.id;
+
+    const { bio, prompts } = req.body;
+
+    // ----- Validation -----
+
+    if (bio && typeof bio !== "string") {
+      return res.status(400).json({
+        error: "Bio must be a string",
+      });
+    }
+
+    if (prompts && typeof prompts !== "object") {
+      return res.status(400).json({
+        error: "Prompts must be an object",
+      });
+    }
+
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { prompts },
+      data: {
+        bio: bio ? bio.trim() : null,
+        prompts: prompts || null,
+      },
     });
 
     return res.json({
-      user: updated,
+      user: updatedUser,
     });
+
   } catch (err) {
     console.error("ONBOARDING /personality ERROR:", err);
-    return res.status(500).json({ error: "Failed to update personality prompts" });
+
+    return res.status(500).json({
+      error: "Failed to update personality data",
+    });
   }
 });
 

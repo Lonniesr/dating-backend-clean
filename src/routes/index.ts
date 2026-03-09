@@ -12,6 +12,7 @@ import conversationsRoutes from "../modules/messages/routes/conversations";
 import discoverRoutes from "../modules/discover/routes";
 import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
+import profileRoutes from "../modules/user/routes/profile";
 import chatUploadRoute from "../modules/upload/routes/chatUploadRoute";
 import publicInviteRoutes from "../modules/user/routes/public/invite";
 import inviteRoutes from "../modules/invite/routes";
@@ -67,6 +68,7 @@ router.use("/onboarding", onboardingRoutes);
 
 // Core user routes
 router.use("/user", userRoutes);
+router.use("/profile", profileRoutes);
 router.use("/user/photos", photosRouter);
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
@@ -89,8 +91,8 @@ router.use("/user/selfie-verification", selfieVerificationRoutes);
  * otherwise Express will treat "stats" and "leaderboard" as invite codes.
  */
 
-router.use("/invite", inviteRoutes);        // POST /invite, GET /invite/stats, GET /invite/leaderboard
-router.use("/invite", publicInviteRoutes);  // GET /invite/:code
+router.use("/invite", inviteRoutes);
+router.use("/invite", publicInviteRoutes);
 
 router.use("/upload/chat", chatUploadRoute);
 

@@ -11,7 +11,7 @@ router.get("/", async (_req: Request, res: Response) => {
     const admins = await prisma.admin.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        User: true, // ⚠️ Prisma relations are case-sensitive
+        user: true, // ⚠️ Prisma relations are case-sensitive
       },
     });
 

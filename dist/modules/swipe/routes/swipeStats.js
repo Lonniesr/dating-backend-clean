@@ -7,47 +7,53 @@ const express_1 = require("express");
 const prisma_1 = __importDefault(require("../../../prisma"));
 const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
+/**
+ * GET /api/swipe/stats
+ */
 router.get("/", requireUser_1.requireUser, async (req, res) => {
     try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
         const userId = req.user.id;
-        const totalSwipes = await prisma_1.default.swipe.count({
-            where: { swiperId: userId }
-        });
-        const likesGiven = await prisma_1.default.swipe.count({
-            where: { swiperId: userId, direction: "like" }
-        });
-        const likesReceived = await prisma_1.default.swipe.count({
-            where: { targetId: userId, direction: "like" }
-        });
-        const matches = await prisma_1.default.match.count({
-            where: {
-                OR: [
-                    { userAId: userId },
-                    { userBId: userId }
-                ]
-            }
-        });
-        const last7Days = await prisma_1.default.swipe.groupBy({
-            by: ["createdAt"],
-            where: {
-                swiperId: userId,
-                createdAt: {
-                    gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+        const [likesGiven, passesGiven, superLikesGiven, likesReceived] = await Promise.all([
+            prisma_1.default.swipe.count({
+                where: {
+                    swiperId: userId,
+                    liked: true
                 }
-            },
-            _count: true
-        });
-        return res.json({
-            totalSwipes,
+            }),
+            prisma_1.default.swipe.count({
+                where: {
+                    swiperId: userId,
+                    liked: false
+                }
+            }),
+            prisma_1.default.swipe.count({
+                where: {
+                    swiperId: userId,
+                    superLike: true
+                }
+            }),
+            prisma_1.default.swipe.count({
+                where: {
+                    targetId: userId,
+                    liked: true
+                }
+            })
+        ]);
+        res.json({
             likesGiven,
-            likesReceived,
-            matches,
-            activity: last7Days
+            passesGiven,
+            superLikesGiven,
+            likesReceived
         });
     }
     catch (err) {
         console.error("SWIPE STATS ERROR:", err);
-        return res.status(500).json({ error: "Server error" });
+        res.status(500).json({
+            message: "Failed to load swipe stats"
+        });
     }
 });
 exports.default = router;

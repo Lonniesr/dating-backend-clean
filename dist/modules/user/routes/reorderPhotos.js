@@ -7,7 +7,6 @@ exports.default = reorderPhotos;
 const prisma_1 = __importDefault(require("../../../prisma"));
 async function reorderPhotos(req, res) {
     try {
-        // ✅ Type-safe auth guard
         if (!req.user) {
             return res.status(401).json({ error: "Unauthorized" });
         }
@@ -16,12 +15,18 @@ async function reorderPhotos(req, res) {
         if (!Array.isArray(newOrder)) {
             return res.status(400).json({ error: "Invalid photo order" });
         }
-        const updated = await prisma_1.default.user.update({
-            where: { id: userId },
-            data: { photos: newOrder },
-            select: { photos: true },
+        await Promise.all(newOrder.map((photoId, index) => prisma_1.default.photo.update({
+            where: { id: photoId },
+            data: { order: index },
+        })));
+        const photos = await prisma_1.default.photo.findMany({
+            where: { userId },
+            orderBy: { order: "asc" },
+            select: { url: true },
         });
-        return res.json({ photos: updated.photos });
+        return res.json({
+            photos: photos.map((p) => p.url),
+        });
     }
     catch (err) {
         console.error("REORDER PHOTO ERROR:", err);

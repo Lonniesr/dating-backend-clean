@@ -12,6 +12,9 @@ const router = (0, express_1.Router)();
 router.post("/", async (req, res) => {
     const { email, password, invite } = req.body;
     try {
+        /* =========================
+           VALIDATION
+        ========================= */
         if (!email || !password || !invite) {
             return res.status(400).json({ message: "Missing required fields." });
         }
@@ -27,19 +30,23 @@ router.post("/", async (req, res) => {
         if (inviteRecord.expiresAt && inviteRecord.expiresAt < new Date()) {
             return res.status(400).json({ reason: "expired" });
         }
-        const existing = await prisma_1.default.user.findUnique({
+        const existingUser = await prisma_1.default.user.findUnique({
             where: { email },
         });
-        if (existing) {
+        if (existingUser) {
             return res.status(400).json({ message: "Email already registered." });
         }
+        /* =========================
+           CREATE USER
+        ========================= */
         const hashedPassword = await bcryptjs_1.default.hash(password, 10);
         const user = await prisma_1.default.user.create({
             data: {
                 email,
                 password: hashedPassword,
                 onboardingComplete: false,
-                role: "user", // default role
+                role: "user",
+                inviteCode: inviteRecord.code,
             },
             select: {
                 id: true,
@@ -48,30 +55,40 @@ router.post("/", async (req, res) => {
                 onboardingComplete: true,
             },
         });
+        /* =========================
+           UPDATE INVITE (ANALYTICS)
+        ========================= */
         await prisma_1.default.invite.update({
             where: { id: inviteRecord.id },
             data: {
                 used: true,
                 usedAt: new Date(),
                 usedById: user.id,
+                signupCount: { increment: 1 },
             },
         });
-        // ✅ STANDARDIZED JWT STRUCTURE
+        /* =========================
+           ISSUE JWT
+        ========================= */
         const token = jsonwebtoken_1.default.sign({
             sub: user.id,
             role: user.role,
         }, env_1.env.JWT_SECRET, { expiresIn: "7d" });
+        /* =========================
+           COOKIE CONFIG (FIXED)
+        ========================= */
+        const isProduction = env_1.env.NODE_ENV === "production";
         res.cookie("token", token, {
             httpOnly: true,
-            secure: env_1.env.NODE_ENV === "production",
-            sameSite: env_1.env.NODE_ENV === "production" ? "none" : "lax",
+            secure: isProduction, // true only on HTTPS production
+            sameSite: isProduction ? "none" : "lax", // lax for localhost
             path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
         return res.json({ success: true, user });
     }
-    catch (err) {
-        console.error("SIGNUP ERROR:", err);
+    catch (error) {
+        console.error("SIGNUP ERROR:", error);
         return res.status(500).json({ success: false });
     }
 });

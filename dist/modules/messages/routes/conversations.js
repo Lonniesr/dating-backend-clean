@@ -13,17 +13,28 @@ const router = (0, express_1.Router)();
  */
 router.get("/", requireUser_1.requireUser, async (req, res) => {
     try {
-        if (!req.user) {
-            return res.status(401).json({ message: "Unauthorized" });
-        }
         const userId = req.user.id;
         const conversations = await prisma_1.default.conversation.findMany({
             where: {
                 OR: [{ userAId: userId }, { userBId: userId }],
             },
             include: {
-                userA: true,
-                userB: true,
+                userA: {
+                    include: {
+                        photos: {
+                            orderBy: { order: "asc" },
+                            take: 1,
+                        },
+                    },
+                },
+                userB: {
+                    include: {
+                        photos: {
+                            orderBy: { order: "asc" },
+                            take: 1,
+                        },
+                    },
+                },
                 lastMessage: true,
             },
             orderBy: {
@@ -31,10 +42,8 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
             },
         });
         const formatted = await Promise.all(conversations.map(async (c) => {
-            var _a;
+            var _a, _b, _c;
             const other = c.userAId === userId ? c.userB : c.userA;
-            if (!other)
-                return null;
             const unreadCount = await prisma_1.default.message.count({
                 where: {
                     conversationId: c.id,
@@ -47,9 +56,7 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
                 user: {
                     id: other.id,
                     name: other.name,
-                    avatar: Array.isArray(other.photos)
-                        ? (_a = other.photos[0]) !== null && _a !== void 0 ? _a : null
-                        : null,
+                    avatar: (_c = (_b = (_a = other.photos) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.url) !== null && _c !== void 0 ? _c : null,
                     online: false,
                 },
                 lastMessage: c.lastMessage
@@ -64,7 +71,7 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
                 unreadCount,
             };
         }));
-        res.json(formatted.filter(Boolean));
+        res.json(formatted);
     }
     catch (err) {
         console.error("CONVERSATIONS ERROR:", err);

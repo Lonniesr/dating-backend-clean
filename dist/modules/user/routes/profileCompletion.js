@@ -11,26 +11,27 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
     try {
         const userId = req.user.id;
         const user = await prisma_1.default.user.findUnique({
-            where: { id: userId }
+            where: { id: userId },
+            include: { photos: true },
         });
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
         const personalityComplete = Array.isArray(user.prompts) && user.prompts.length > 0;
-        const photosComplete = Array.isArray(user.photos) && user.photos.length >= 1;
+        const photosComplete = user.photos.length >= 1;
         const checks = {
             name: !!user.name,
             gender: !!user.gender,
             preferences: !!user.preferences,
             personality: personalityComplete,
-            photos: photosComplete
+            photos: photosComplete,
         };
         const total = Object.keys(checks).length;
         const completed = Object.values(checks).filter(Boolean).length;
         const percent = Math.round((completed / total) * 100);
         return res.json({
             percent,
-            checks
+            checks,
         });
     }
     catch (err) {

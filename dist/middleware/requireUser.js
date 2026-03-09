@@ -6,18 +6,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireUser = requireUser;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../prisma"));
-const env_1 = require("../config/env");
+const env_1 = require("./../config/env");
 /* =========================
-   TOKEN EXTRACTION (FIXED)
+   TOKEN EXTRACTION
 ========================= */
 function getToken(req) {
     var _a;
     const authHeader = req.headers.authorization;
-    // Bearer token
     if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
         return authHeader.split(" ")[1];
     }
-    // Cookie token (SAFE NARROWING)
     const cookieToken = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.token;
     if (typeof cookieToken === "string") {
         return cookieToken;
@@ -60,6 +58,7 @@ async function requireUser(req, res, next) {
             select: {
                 id: true,
                 email: true,
+                role: true,
                 onboardingComplete: true,
                 name: true,
                 gender: true,
@@ -68,6 +67,17 @@ async function requireUser(req, res, next) {
         });
         if (!user) {
             res.status(401).json({ error: "Unauthorized" });
+            return;
+        }
+        /* =========================
+           ONBOARDING GUARD
+        ========================== */
+        const isOnboardingRoute = req.originalUrl.startsWith("/api/onboarding");
+        if (!user.onboardingComplete && !isOnboardingRoute) {
+            res.status(403).json({
+                error: "Onboarding incomplete",
+                onboardingRequired: true,
+            });
             return;
         }
         req.user = user;

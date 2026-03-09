@@ -17,7 +17,7 @@ router.get("/", requireAdmin_1.requireAdmin, async (_req, res) => {
         const invites = await prisma_1.default.invite.findMany({
             orderBy: { createdAt: "desc" },
             include: {
-                User_Invite_usedByIdToUser: {
+                usedBy: {
                     select: { id: true, name: true, email: true },
                 },
             },
@@ -33,8 +33,16 @@ router.get("/", requireAdmin_1.requireAdmin, async (_req, res) => {
    CREATE INVITE
 ========================= */
 router.post("/", requireAdmin_1.requireAdmin, async (req, res) => {
+    var _a;
     try {
+        console.log("=== CREATE INVITE DEBUG ===");
+        console.log("BODY:", req.body);
+        console.log("USER:", req.user);
         const { email, expiresAt, premium } = req.body;
+        if (!((_a = req.user) === null || _a === void 0 ? void 0 : _a.id)) {
+            console.error("Missing req.user or user.id");
+            return res.status(401).json({ error: "Unauthorized" });
+        }
         const code = crypto_1.default.randomBytes(16).toString("hex");
         const invite = await prisma_1.default.invite.create({
             data: {
@@ -56,7 +64,10 @@ router.post("/", requireAdmin_1.requireAdmin, async (req, res) => {
     }
     catch (err) {
         console.error("INVITE CREATE ERROR:", err);
-        return res.status(500).json({ error: "Server error" });
+        return res.status(500).json({
+            error: "Invite creation failed",
+            details: (err === null || err === void 0 ? void 0 : err.message) || err,
+        });
     }
 });
 exports.default = router;

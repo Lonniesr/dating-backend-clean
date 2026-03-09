@@ -9,13 +9,25 @@ const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 /**
  * GET /api/messages/:id
- * Returns full chat history with a specific user
+ * Returns chat history with a specific user
  */
 router.get("/:id", requireUser_1.requireUser, async (req, res) => {
     try {
         const userId = req.user.id;
         const otherId = req.params.id;
-        // Find or create conversation
+        const match = await prisma_1.default.match.findFirst({
+            where: {
+                OR: [
+                    { userAId: userId, userBId: otherId },
+                    { userAId: otherId, userBId: userId },
+                ],
+            },
+        });
+        if (!match) {
+            return res
+                .status(403)
+                .json({ message: "You can only message users you matched with." });
+        }
         let conversation = await prisma_1.default.conversation.findFirst({
             where: {
                 OR: [
@@ -34,9 +46,9 @@ router.get("/:id", requireUser_1.requireUser, async (req, res) => {
         }
         const messages = await prisma_1.default.message.findMany({
             where: { conversationId: conversation.id },
-            orderBy: { createdAt: "asc" },
+            orderBy: { createdAt: "desc" },
+            take: 50,
         });
-        // Mark unread messages as read
         await prisma_1.default.message.updateMany({
             where: {
                 conversationId: conversation.id,
@@ -45,7 +57,7 @@ router.get("/:id", requireUser_1.requireUser, async (req, res) => {
             },
             data: { read: true },
         });
-        res.json(messages);
+        res.json(messages.reverse());
     }
     catch (err) {
         console.error("CHAT FETCH ERROR:", err);
@@ -54,14 +66,44 @@ router.get("/:id", requireUser_1.requireUser, async (req, res) => {
 });
 /**
  * POST /api/messages/:id
- * Send a message to a specific user
+ * Send a message
  */
 router.post("/:id", requireUser_1.requireUser, async (req, res) => {
     try {
         const senderId = req.user.id;
         const receiverId = req.params.id;
-        const { text } = req.body;
-        // Find or create conversation
+        const { text, imageUrl, audioUrl, replyToId } = req.body;
+        const sender = await prisma_1.default.user.findUnique({
+            where: { id: senderId },
+            select: { verified: true },
+        });
+        if (!sender) {
+            return res.status(401).json({ message: "Unauthorized." });
+        }
+        // 🔒 block media for unverified users
+        if (!sender.verified && (imageUrl || audioUrl)) {
+            return res.status(403).json({
+                message: "Verify your profile to send photos and voice messages.",
+            });
+        }
+        if (!text && !imageUrl && !audioUrl) {
+            return res.status(400).json({
+                message: "Message cannot be empty.",
+            });
+        }
+        const match = await prisma_1.default.match.findFirst({
+            where: {
+                OR: [
+                    { userAId: senderId, userBId: receiverId },
+                    { userAId: receiverId, userBId: senderId },
+                ],
+            },
+        });
+        if (!match) {
+            return res
+                .status(403)
+                .json({ message: "You can only message users you matched with." });
+        }
         let conversation = await prisma_1.default.conversation.findFirst({
             where: {
                 OR: [
@@ -78,16 +120,17 @@ router.post("/:id", requireUser_1.requireUser, async (req, res) => {
                 },
             });
         }
-        // Create message
         const message = await prisma_1.default.message.create({
             data: {
                 senderId,
                 receiverId,
                 text,
+                imageUrl,
+                audioUrl,
+                replyToId,
                 conversationId: conversation.id,
             },
         });
-        // Update lastMessage pointer
         await prisma_1.default.conversation.update({
             where: { id: conversation.id },
             data: {

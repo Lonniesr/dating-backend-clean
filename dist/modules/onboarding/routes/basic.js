@@ -8,12 +8,16 @@ const prisma_1 = __importDefault(require("../../../prisma"));
 const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 router.post("/", requireUser_1.requireUser, async (req, res) => {
+    var _a;
     try {
-        if (!req.user || !req.user.id) {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
+        if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const { name, birthdate, gender, race } = req.body;
-        // ----- Validation -----
+        const { name, birthdate, gender, race, bio, birthplace, latitude, longitude, } = req.body;
+        /* =========================
+           VALIDATION
+        ========================= */
         if (!name || !birthdate || !gender || !race) {
             return res.status(400).json({
                 message: "Name, birthdate, gender, and race are required.",
@@ -33,16 +37,56 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
                 message: "Invalid race value.",
             });
         }
+        const parsedBirthdate = new Date(birthdate);
+        if (isNaN(parsedBirthdate.getTime())) {
+            return res.status(400).json({
+                message: "Invalid birthdate format.",
+            });
+        }
+        /* =========================
+           AGE CALCULATION
+        ========================= */
+        const today = new Date();
+        let age = today.getFullYear() - parsedBirthdate.getFullYear();
+        const m = today.getMonth() - parsedBirthdate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < parsedBirthdate.getDate())) {
+            age--;
+        }
+        /* =========================
+           UPDATE USER
+        ========================= */
         const updatedUser = await prisma_1.default.user.update({
-            where: { id: req.user.id },
+            where: { id: userId },
             data: {
                 name: name.trim(),
-                birthdate: new Date(birthdate),
+                birthdate: parsedBirthdate,
+                age,
                 gender,
                 race,
+                bio: (bio === null || bio === void 0 ? void 0 : bio.trim()) || null,
+                birthplace: (birthplace === null || birthplace === void 0 ? void 0 : birthplace.trim()) || null,
+                latitude: latitude !== undefined && latitude !== null
+                    ? Number(latitude)
+                    : null,
+                longitude: longitude !== undefined && longitude !== null
+                    ? Number(longitude)
+                    : null,
+            },
+            select: {
+                id: true,
+                name: true,
+                birthdate: true,
+                age: true,
+                gender: true,
+                race: true,
+                bio: true,
+                birthplace: true,
+                latitude: true,
+                longitude: true,
             },
         });
         return res.status(200).json({
+            success: true,
             user: updatedUser,
         });
     }

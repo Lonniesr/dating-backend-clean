@@ -10,15 +10,24 @@ const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 router.post("/", requireUser_1.requireUser, async (req, res) => {
     try {
-        const { oldPassword, newPassword } = req.body;
+        const { currentPassword, newPassword } = req.body;
+        // Safety validation
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: "Missing password fields" });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: "New password must be at least 6 characters" });
+        }
         const user = await prisma_1.default.user.findUnique({
             where: { id: req.user.id },
         });
-        if (!user)
+        if (!user || !user.password) {
             return res.status(404).json({ error: "User not found" });
-        const valid = await bcryptjs_1.default.compare(oldPassword, user.password);
-        if (!valid)
+        }
+        const valid = await bcryptjs_1.default.compare(currentPassword, user.password);
+        if (!valid) {
             return res.status(401).json({ error: "Incorrect password" });
+        }
         const hashed = await bcryptjs_1.default.hash(newPassword, 10);
         await prisma_1.default.user.update({
             where: { id: req.user.id },

@@ -7,38 +7,63 @@ const express_1 = require("express");
 const prisma_1 = __importDefault(require("../../../prisma"));
 const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
+/**
+ * POST /api/onboarding/photos
+ * Saves user photo URLs
+ */
 router.post("/", requireUser_1.requireUser, async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
         const userId = req.user.id;
         const { photos } = req.body;
-        // Validate input
+        /* ==============================
+           VALIDATION
+        ============================== */
         if (!Array.isArray(photos)) {
-            return res.status(400).json({ error: "Photos must be an array" });
+            return res.status(400).json({
+                error: "Photos must be an array",
+            });
         }
         if (photos.length === 0) {
-            return res.status(400).json({ error: "At least one photo is required" });
+            return res.status(400).json({
+                error: "At least one photo is required",
+            });
         }
-        // Optional: ensure all items are strings
-        const allStrings = photos.every((p) => typeof p === "string");
-        if (!allStrings) {
-            return res.status(400).json({ error: "All photos must be string URLs" });
+        if (photos.length > 6) {
+            return res.status(400).json({
+                error: "Maximum of 6 photos allowed",
+            });
         }
-        const updatedUser = await prisma_1.default.user.update({
+        const cleanedPhotos = photos.map((p) => typeof p === "string" ? p.trim() : "");
+        const validPhotos = cleanedPhotos.every((url) => typeof url === "string" && url.startsWith("http"));
+        if (!validPhotos) {
+            return res.status(400).json({
+                error: "All photos must be valid URLs",
+            });
+        }
+        /* ==============================
+           SAVE PHOTOS
+        ============================== */
+        // delete existing photos
+        await prisma_1.default.photo.deleteMany({
+            where: { userId },
+        });
+        // create new photos
+        await prisma_1.default.photo.createMany({
+            data: cleanedPhotos.map((url, index) => ({
+                userId,
+                url,
+                order: index,
+            })),
+        });
+        const updatedUser = await prisma_1.default.user.findUnique({
             where: { id: userId },
-            data: {
+            include: {
                 photos: {
-                    set: photos, // safer for array fields
+                    orderBy: { order: "asc" },
                 },
-            },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                gender: true,
-                photos: true,
-                onboardingComplete: true,
-                createdAt: true,
-                updatedAt: true,
             },
         });
         return res.json({
@@ -48,7 +73,9 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
     }
     catch (err) {
         console.error("ONBOARDING /photos ERROR:", err);
-        return res.status(500).json({ error: "Failed to update photos" });
+        return res.status(500).json({
+            error: "Failed to update photos",
+        });
     }
 });
 exports.default = router;

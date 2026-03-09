@@ -19,6 +19,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const routes_1 = __importDefault(require("./routes"));
 const sockets_1 = require("./sockets");
 const env_1 = require("./config/env");
+const updateLastActive_1 = require("./middleware/updateLastActive");
 /* =========================
    APP + SERVER
 ========================= */
@@ -41,7 +42,7 @@ app.use((0, cookie_parser_1.default)());
 app.use(express_1.default.json({ limit: "1mb" }));
 app.use(express_1.default.urlencoded({ extended: true }));
 /* =========================
-   CORS (PRODUCTION SAFE)
+   CORS (FIXED FOR LOCAL + PROD)
 ========================= */
 const allowedOrigins = (env_1.env.CORS_ORIGIN || "")
     .split(",")
@@ -51,14 +52,12 @@ app.use((0, cors_1.default)({
     origin: (origin, callback) => {
         if (!origin)
             return callback(null, true);
-        // Allow localhost automatically in dev
-        if (env_1.env.NODE_ENV !== "production") {
-            if (origin.startsWith("http://localhost") ||
-                origin.startsWith("http://127.0.0.1")) {
-                return callback(null, true);
-            }
+        /* Always allow localhost for development */
+        if (origin.startsWith("http://localhost") ||
+            origin.startsWith("http://127.0.0.1")) {
+            return callback(null, true);
         }
-        // Relaxed matching to prevent subtle formatting mismatches
+        /* Allow production domains */
         const allowed = allowedOrigins.some((o) => origin.startsWith(o));
         if (allowed) {
             return callback(null, true);
@@ -101,6 +100,10 @@ app.get("/health", (_req, res) => {
         env: env_1.env.NODE_ENV,
     });
 });
+/* =========================
+   USER ACTIVITY TRACKING
+========================= */
+app.use(updateLastActive_1.updateLastActive);
 /* =========================
    ROUTES
 ========================= */

@@ -10,6 +10,18 @@ const preferences_1 = __importDefault(require("./preferences"));
 const personality_1 = __importDefault(require("./personality"));
 const complete_1 = __importDefault(require("./complete"));
 const router = (0, express_1.Router)();
+/**
+ * ONBOARDING ROUTES
+ *
+ * Base path: /api/onboarding
+ *
+ * Endpoints:
+ * POST /api/onboarding/basic
+ * POST /api/onboarding/photos
+ * POST /api/onboarding/preferences
+ * POST /api/onboarding/personality
+ * POST /api/onboarding/complete
+ */
 router.use("/basic", basic_1.default);
 router.use("/photos", photos_1.default);
 router.use("/preferences", preferences_1.default);

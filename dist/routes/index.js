@@ -8,14 +8,30 @@ const express_1 = require("express");
    USER ROUTES
 ========================= */
 const routes_1 = __importDefault(require("../modules/auth/routes"));
-const me_1 = __importDefault(require("../modules/auth/routes/me"));
 const routes_2 = __importDefault(require("../modules/onboarding/routes"));
 const routes_3 = __importDefault(require("../modules/match/routes"));
 const routes_4 = __importDefault(require("../modules/messages/routes"));
+const conversations_1 = __importDefault(require("../modules/messages/routes/conversations"));
 const routes_5 = __importDefault(require("../modules/discover/routes"));
 const routes_6 = __importDefault(require("../modules/swipe/routes"));
 const routes_7 = __importDefault(require("../modules/user/routes"));
+const profile_1 = __importDefault(require("../modules/user/routes/profile"));
 const chatUploadRoute_1 = __importDefault(require("../modules/upload/routes/chatUploadRoute"));
+const invite_1 = __importDefault(require("../modules/user/routes/public/invite"));
+const routes_8 = __importDefault(require("../modules/invite/routes"));
+const profileCompletion_1 = __importDefault(require("../modules/user/routes/profileCompletion"));
+const matchCount_1 = __importDefault(require("../modules/user/routes/matchCount"));
+const stats_1 = __importDefault(require("../modules/user/routes/stats"));
+const photos_1 = __importDefault(require("../modules/user/routes/photos"));
+/* =========================
+   VERIFICATION ROUTES
+========================= */
+const verification_1 = __importDefault(require("../modules/user/routes/verification"));
+const selfieVerification_1 = __importDefault(require("../modules/user/routes/selfieVerification"));
+/* =========================
+   SETTINGS ROUTES
+========================= */
+const routes_9 = __importDefault(require("../modules/settings/routes"));
 /* =========================
    ADMIN ROUTES
 ========================= */
@@ -30,28 +46,56 @@ const admin_matches_1 = __importDefault(require("../modules/admin/routes/admin.m
 const admin_verification_1 = __importDefault(require("../modules/admin/routes/admin.verification"));
 const admin_messages_1 = __importDefault(require("../modules/admin/routes/admin.messages"));
 const admin_settings_1 = __importDefault(require("../modules/admin/routes/admin.settings"));
+const admin_analytics_1 = __importDefault(require("../modules/admin/routes/admin.analytics"));
 const router = (0, express_1.Router)();
 /* =========================
-   AUTH
+   AUTH DOMAIN
 ========================= */
 router.use("/auth", routes_1.default);
-/**
- * GET /api/me
- */
-router.use("/me", me_1.default);
 /* =========================
    USER DOMAIN
 ========================= */
 router.use("/onboarding", routes_2.default);
+// Core user routes
 router.use("/user", routes_7.default);
+router.use("/profile", profile_1.default);
+router.use("/user/photos", photos_1.default);
+router.use("/user/profile-completion", profileCompletion_1.default);
+router.use("/user/match-count", matchCount_1.default);
+router.use("/user/swipe-stats", stats_1.default);
+/* =========================
+   USER VERIFICATION
+========================= */
+router.use("/user/verify", verification_1.default);
+router.use("/user/selfie-verification", selfieVerification_1.default);
+/* =========================
+   INVITE SYSTEM
+========================= */
+/**
+ * IMPORTANT:
+ * Specific invite routes must come BEFORE the dynamic /:code route
+ * otherwise Express will treat "stats" and "leaderboard" as invite codes.
+ */
+router.use("/invite", routes_8.default);
+router.use("/invite", invite_1.default);
 router.use("/upload/chat", chatUploadRoute_1.default);
+/* =========================
+   MATCHING DOMAIN
+========================= */
 router.use("/match", routes_3.default);
-router.use("/messages", routes_4.default);
 router.use("/discover", routes_5.default);
 router.use("/swipe", routes_6.default);
 /* =========================
+   MESSAGING DOMAIN
+========================= */
+router.use("/conversations", conversations_1.default);
+router.use("/messages", routes_4.default);
+/* =========================
+   SETTINGS DOMAIN
+========================= */
+router.use("/settings", routes_9.default);
+/* =========================
    ADMIN DOMAIN
-   Mounted at /api/admin/*
 ========================= */
 router.use("/admin/dashboard", admin_dashboard_1.default);
 router.use("/admin/users", admin_users_1.default);
@@ -64,7 +108,5 @@ router.use("/admin/matches", admin_matches_1.default);
 router.use("/admin/verification", admin_verification_1.default);
 router.use("/admin/messages", admin_messages_1.default);
 router.use("/admin/settings", admin_settings_1.default);
-/* =========================
-   EXPORT
-========================= */
+router.use("/admin/analytics", admin_analytics_1.default);
 exports.default = router;

@@ -26,6 +26,7 @@ exports.env = {
     CORS_ORIGIN: optional("CORS_ORIGIN"),
     ADMIN_CORS_ORIGIN: optional("ADMIN_CORS_ORIGIN"),
     REDIS_URL: optional("REDIS_URL"),
-    // ✅ ADD THIS
     FRONTEND_URL: optional("FRONTEND_URL"),
+    SUPABASE_URL: required("SUPABASE_URL"),
+    SUPABASE_SERVICE_ROLE_KEY: required("SUPABASE_SERVICE_ROLE_KEY"),
 };

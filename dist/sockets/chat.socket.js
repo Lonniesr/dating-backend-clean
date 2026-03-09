@@ -6,118 +6,130 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.registerChatSocket = registerChatSocket;
 const prisma_1 = __importDefault(require("../prisma"));
 const socketAuth_1 = require("../middleware/socketAuth");
+function getConversationRoom(a, b) {
+    return `conversation:${[a, b].sort().join(":")}`;
+}
 function registerChatSocket(io) {
-    const chatNamespace = io.of("/chat");
-    // 🔐 Centralized auth
-    chatNamespace.use((0, socketAuth_1.socketAuth)());
-    chatNamespace.on("connection", (socket) => {
+    const nsp = io.of("/chat");
+    nsp.use((0, socketAuth_1.socketAuth)());
+    nsp.on("connection", async (socket) => {
         const userId = socket.data.userId;
         if (!userId) {
             socket.disconnect();
             return;
         }
-        console.log(`💬 Chat connected: ${userId}`);
+        console.log("💬 Chat connected:", userId);
         socket.join(`user:${userId}`);
-        chatNamespace.emit("user:presence", {
-            userId,
-            online: true,
+        // =========================
+        // JOIN CONVERSATION
+        // =========================
+        socket.on("conversation:join", ({ otherUserId }) => {
+            if (!otherUserId)
+                return;
+            const room = getConversationRoom(userId, otherUserId);
+            socket.join(room);
         });
-        // ================================
+        // =========================
         // SEND MESSAGE
-        // ================================
-        socket.on("message:send", async (payload) => {
-            if (typeof payload !== "object" || payload === null)
-                return;
-            const { tempId, receiverId, text } = payload;
-            if (typeof receiverId !== "string" ||
-                typeof text !== "string" ||
-                text.length === 0 ||
-                text.length > 2000) {
-                return;
-            }
-            if (receiverId === userId)
+        // =========================
+        socket.on("message:send", async ({ receiverId, text }) => {
+            if (!receiverId || !text || text.length === 0)
                 return;
             try {
-                const receiver = await prisma_1.default.user.findUnique({
-                    where: { id: receiverId },
+                // Verify match
+                const match = await prisma_1.default.match.findFirst({
+                    where: {
+                        OR: [
+                            { userAId: userId, userBId: receiverId },
+                            { userAId: receiverId, userBId: userId },
+                        ],
+                    },
                 });
-                if (!receiver)
+                if (!match)
                     return;
+                // Find conversation
+                let conversation = await prisma_1.default.conversation.findFirst({
+                    where: {
+                        OR: [
+                            { userAId: userId, userBId: receiverId },
+                            { userAId: receiverId, userBId: userId },
+                        ],
+                    },
+                });
+                if (!conversation) {
+                    conversation = await prisma_1.default.conversation.create({
+                        data: {
+                            userAId: userId,
+                            userBId: receiverId,
+                        },
+                    });
+                }
                 const message = await prisma_1.default.message.create({
                     data: {
                         senderId: userId,
                         receiverId,
                         text,
-                        delivered: false,
+                        conversationId: conversation.id,
                         read: false,
                     },
                 });
-                chatNamespace.to(`user:${receiverId}`).emit("message:new", message);
-                socket.emit("message:delivered", {
-                    tempId,
-                    messageId: message.id,
+                await prisma_1.default.conversation.update({
+                    where: { id: conversation.id },
+                    data: {
+                        lastMessageId: message.id,
+                        updatedAt: new Date(),
+                    },
+                });
+                const room = getConversationRoom(userId, receiverId);
+                nsp.to(room).emit("message:new", message);
+                nsp.to(`user:${receiverId}`).emit("conversation:update", {
+                    conversationId: conversation.id,
                 });
             }
             catch (err) {
-                console.error("Message error:", err);
+                console.error("CHAT MESSAGE ERROR:", err);
             }
         });
-        // ================================
+        // =========================
         // TYPING
-        // ================================
-        socket.on("typing:start", (payload) => {
-            const { toUserId } = payload || {};
-            if (typeof toUserId !== "string")
+        // =========================
+        socket.on("typing:start", ({ toUserId }) => {
+            if (!toUserId)
                 return;
-            chatNamespace.to(`user:${toUserId}`).emit("typing:start", {
+            const room = getConversationRoom(userId, toUserId);
+            nsp.to(room).emit("typing:start", {
                 fromUserId: userId,
             });
         });
-        socket.on("typing:stop", (payload) => {
-            const { toUserId } = payload || {};
-            if (typeof toUserId !== "string")
+        socket.on("typing:stop", ({ toUserId }) => {
+            if (!toUserId)
                 return;
-            chatNamespace.to(`user:${toUserId}`).emit("typing:stop", {
+            const room = getConversationRoom(userId, toUserId);
+            nsp.to(room).emit("typing:stop", {
                 fromUserId: userId,
             });
         });
-        // ================================
+        // =========================
         // READ RECEIPT
-        // ================================
-        socket.on("message:read", async (payload) => {
-            const { messageId } = payload || {};
-            if (typeof messageId !== "string")
+        // =========================
+        socket.on("message:read", async ({ otherUserId }) => {
+            if (!otherUserId)
                 return;
-            try {
-                const message = await prisma_1.default.message.findUnique({
-                    where: { id: messageId },
-                });
-                if (!message || message.receiverId !== userId)
-                    return;
-                await prisma_1.default.message.update({
-                    where: { id: messageId },
-                    data: { read: true },
-                });
-                chatNamespace.to(`user:${message.senderId}`).emit("message:read", {
-                    messageId,
-                });
-            }
-            catch (err) {
-                console.error("Read receipt error:", err);
-            }
+            await prisma_1.default.message.updateMany({
+                where: {
+                    senderId: otherUserId,
+                    receiverId: userId,
+                    read: false,
+                },
+                data: { read: true },
+            });
+            const room = getConversationRoom(userId, otherUserId);
+            nsp.to(room).emit("message:read:update", {
+                readerId: userId,
+            });
         });
-        // ================================
-        // DISCONNECT (Redis-safe presence)
-        // ================================
-        socket.on("disconnect", async () => {
-            console.log(`💬 Chat disconnected: ${userId}`);
-            const sockets = await chatNamespace.in(`user:${userId}`).fetchSockets();
-            if (sockets.length === 0) {
-                chatNamespace.emit("user:presence", {
-                    userId,
-                    online: false,
-                });
-            }
+        socket.on("disconnect", () => {
+            console.log("💬 Chat disconnected:", userId);
         });
     });
 }

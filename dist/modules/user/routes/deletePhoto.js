@@ -15,21 +15,23 @@ async function deletePhoto(req, res) {
         if (isNaN(index)) {
             return res.status(400).json({ error: "Invalid photo index" });
         }
-        const user = await prisma_1.default.user.findUnique({
-            where: { id: userId },
-            select: { photos: true },
+        const photos = await prisma_1.default.photo.findMany({
+            where: { userId },
+            orderBy: { order: "asc" },
         });
-        if (!user || !user.photos[index]) {
+        const target = photos[index];
+        if (!target) {
             return res.status(400).json({ error: "Invalid photo index" });
         }
-        const photos = user.photos;
-        const updatedPhotos = photos.filter((_, i) => i !== index);
-        const updated = await prisma_1.default.user.update({
-            where: { id: userId },
-            data: { photos: updatedPhotos },
-            select: { photos: true },
+        await prisma_1.default.photo.delete({
+            where: { id: target.id },
         });
-        return res.json({ photos: updated.photos });
+        const remaining = await prisma_1.default.photo.findMany({
+            where: { userId },
+            orderBy: { order: "asc" },
+        });
+        const urls = remaining.map((p) => p.url);
+        return res.json({ photos: urls });
     }
     catch (err) {
         console.error("DELETE PHOTO ERROR:", err);

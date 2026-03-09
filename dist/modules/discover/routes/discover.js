@@ -4,60 +4,177 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const prisma_1 = __importDefault(require("../../../prisma")); // ✅ FIXED
-const requireUser_1 = require("../../../middleware/requireUser"); // ✅ FIXED
+const prisma_1 = __importDefault(require("../../../prisma"));
+const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 /**
+ * Distance calculator (miles)
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 3958.8;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) ** 2;
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+/**
  * GET /api/discover
- * Returns swipe candidates for the logged-in user
+ * Returns swipe candidates
  */
 router.get("/", requireUser_1.requireUser, async (req, res) => {
     var _a;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.id;
-        if (!userId)
+        if (!userId) {
             return res.status(401).json({ message: "Unauthorized" });
-        // Users this user already swiped on
+        }
+        /**
+         * Current user
+         */
+        const currentUser = await prisma_1.default.user.findUnique({
+            where: { id: userId },
+            select: {
+                gender: true,
+                birthdate: true,
+                preferences: true,
+                latitude: true,
+                longitude: true,
+            },
+        });
+        if (!currentUser) {
+            return res.status(404).json({ message: "User not found." });
+        }
+        const prefs = currentUser.preferences &&
+            typeof currentUser.preferences === "object"
+            ? currentUser.preferences
+            : {};
+        /**
+         * Swiped users
+         */
         const swipes = await prisma_1.default.swipe.findMany({
             where: { swiperId: userId },
             select: { targetId: true },
         });
         const swipedIds = swipes.map((s) => s.targetId);
-        // Users already matched with this user
+        /**
+         * Matched users
+         */
         const matches = await prisma_1.default.match.findMany({
             where: {
                 OR: [{ userAId: userId }, { userBId: userId }],
             },
-            select: { userAId: true, userBId: true },
+            select: {
+                userAId: true,
+                userBId: true,
+            },
         });
         const matchedIds = matches
             .flatMap((m) => [m.userAId, m.userBId])
             .filter((id) => id !== userId);
-        // Fetch candidates
-        const candidates = await prisma_1.default.user.findMany({
-            where: {
-                id: {
-                    not: userId,
-                    notIn: [...swipedIds, ...matchedIds],
-                },
-                onboardingComplete: true,
-                photos: { isEmpty: false },
+        /**
+         * Age filtering
+         */
+        const today = new Date();
+        let minBirthdate;
+        let maxBirthdate;
+        if (prefs.minAge) {
+            maxBirthdate = new Date(today.getFullYear() - prefs.minAge, today.getMonth(), today.getDate());
+        }
+        if (prefs.maxAge) {
+            minBirthdate = new Date(today.getFullYear() - prefs.maxAge, today.getMonth(), today.getDate());
+        }
+        /**
+         * Base query
+         */
+        const whereClause = {
+            id: {
+                not: userId,
+                notIn: [...swipedIds, ...matchedIds],
             },
+            onboardingComplete: true,
+            banned: false,
+            photos: {
+                isEmpty: false,
+            },
+        };
+        /**
+         * Gender filter
+         */
+        if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
+            whereClause.gender =
+                prefs.interestedIn === "Men" ? "male" : "female";
+        }
+        /**
+         * Race preference
+         */
+        if (prefs.racePreference && prefs.racePreference !== "Everyone") {
+            whereClause.race = prefs.racePreference;
+        }
+        /**
+         * Age filter
+         */
+        if (minBirthdate || maxBirthdate) {
+            whereClause.birthdate = {};
+            if (minBirthdate)
+                whereClause.birthdate.gte = minBirthdate;
+            if (maxBirthdate)
+                whereClause.birthdate.lte = maxBirthdate;
+        }
+        /**
+         * Initial candidate pool
+         */
+        const candidates = await prisma_1.default.user.findMany({
+            where: whereClause,
             select: {
                 id: true,
                 name: true,
                 gender: true,
+                race: true,
                 photos: true,
                 birthdate: true,
                 location: true,
+                latitude: true,
+                longitude: true,
+                lastActiveAt: true,
             },
-            take: 20,
+            take: 60,
         });
-        res.json(candidates);
+        /**
+         * Radius filtering
+         */
+        let filtered = candidates;
+        if (prefs.locationRadius &&
+            currentUser.latitude &&
+            currentUser.longitude) {
+            filtered = candidates.filter((user) => {
+                if (!user.latitude || !user.longitude)
+                    return false;
+                const distance = calculateDistance(currentUser.latitude, currentUser.longitude, user.latitude, user.longitude);
+                return distance <= prefs.locationRadius;
+            });
+        }
+        /**
+         * Activity ranking
+         */
+        const ranked = filtered.sort((a, b) => {
+            const aTime = a.lastActiveAt
+                ? new Date(a.lastActiveAt).getTime()
+                : 0;
+            const bTime = b.lastActiveAt
+                ? new Date(b.lastActiveAt).getTime()
+                : 0;
+            return bTime - aTime;
+        });
+        res.json(ranked.slice(0, 30));
     }
     catch (err) {
         console.error("DISCOVER ERROR:", err);
-        res.status(500).json({ message: "Failed to load discover feed." });
+        res.status(500).json({
+            message: "Failed to load discover feed.",
+        });
     }
 });
 exports.default = router;

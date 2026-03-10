@@ -119,25 +119,30 @@ export async function requireUser(
       return;
     }
 
-    /* =========================
-       ONBOARDING GUARD
-    ========================== */
+   /* =========================
+   ONBOARDING GUARD
+========================= */
 
-    const path = req.originalUrl;
+const path = req.originalUrl;
 
-    const allowedBeforeOnboarding =
-      path.startsWith("/api/onboarding") ||
-      path.startsWith("/api/profile") ||
-      path.startsWith("/api/auth") ||
-      path.startsWith("/api/user/photos");
+/**
+ * Routes allowed before onboarding completes
+ */
+const allowedBeforeOnboarding =
+  path.startsWith("/api/onboarding") ||
+  path.startsWith("/api/profile") ||
+  path.startsWith("/api/auth") ||
+  path.startsWith("/api/user") ||     // <-- allows preferences, prompts, profile updates
+  path.startsWith("/api/upload") ||
+  path.startsWith("/api/user/photos");
 
-    if (!user.onboardingComplete && !allowedBeforeOnboarding) {
-      res.status(403).json({
-        error: "Onboarding incomplete",
-        onboardingRequired: true,
-      });
-      return;
-    }
+if (!user.onboardingComplete && !allowedBeforeOnboarding) {
+  res.status(403).json({
+    error: "Onboarding incomplete",
+    onboardingRequired: true,
+  });
+  return;
+}
 
     req.user = user;
 

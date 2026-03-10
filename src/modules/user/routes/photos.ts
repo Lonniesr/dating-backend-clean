@@ -1,115 +1,147 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-router.get("/test", (req, res) => {
-  res.json({ photosRouter: "working" });
-});
-
 /**
  * POST /api/user/photos/upload
+ * Save photo URL to DB
  */
-router.post("/upload", requireUser, async (req: any, res) => {
+router.post("/upload", requireUser, async (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
-    let { url } = req.body;
+    const userId = (req as any).user?.id;
+    const { url } = req.body;
 
-    if (!url || typeof url !== "string") {
-      return res.status(400).json({ error: "Photo URL required" });
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // 🔥 FIX: clean the URL before saving
-    url = url
-      .replace(/^"+|"+$/g, "") // remove quotes
-      .replace(/\\/g, "") // remove escaped slashes
-      .trim();
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ error: "Invalid photo URL" });
+    }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { photos: true },
+    const count = await prisma.photo.count({
+      where: { userId },
     });
 
-    const updatedPhotos = [...(user?.photos || []), url];
-
-    const updated = await prisma.user.update({
-      where: { id: userId },
+    await prisma.photo.create({
       data: {
-        photos: {
-          set: updatedPhotos,
-        },
+        userId,
+        url,
+        order: count,
       },
     });
 
-    return res.json({ success: true, user: updated });
+    const photos = await prisma.photo.findMany({
+      where: { userId },
+      orderBy: { order: "asc" },
+      select: { url: true },
+    });
+
+    res.json({
+      success: true,
+      photos: photos.map((p) => p.url),
+    });
   } catch (err) {
     console.error("PHOTO UPLOAD ERROR:", err);
-    return res.status(500).json({ error: "Failed to upload photo" });
+
+    res.status(500).json({
+      error: "Failed to upload photo",
+    });
   }
 });
 
 /**
  * DELETE /api/user/photos/:index
  */
-router.delete("/:index", requireUser, async (req: any, res) => {
+router.delete("/:index", requireUser, async (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user?.id;
     const index = Number(req.params.index);
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { photos: true },
-    });
-
-    if (!user?.photos) {
-      return res.status(400).json({ error: "No photos found" });
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const updatedPhotos = [...user.photos];
-    updatedPhotos.splice(index, 1);
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        photos: {
-          set: updatedPhotos,
-        },
+    const photo = await prisma.photo.findFirst({
+      where: {
+        userId,
+        order: index,
       },
     });
 
-    return res.json({ success: true });
+    if (!photo) {
+      return res.status(404).json({ error: "Photo not found" });
+    }
+
+    await prisma.photo.delete({
+      where: { id: photo.id },
+    });
+
+    const photos = await prisma.photo.findMany({
+      where: { userId },
+      orderBy: { order: "asc" },
+      select: { url: true },
+    });
+
+    res.json({
+      success: true,
+      photos: photos.map((p) => p.url),
+    });
   } catch (err) {
-    console.error("PHOTO DELETE ERROR:", err);
-    return res.status(500).json({ error: "Failed to delete photo" });
+    console.error("DELETE PHOTO ERROR:", err);
+
+    res.status(500).json({
+      error: "Failed to delete photo",
+    });
   }
 });
 
 /**
  * PUT /api/user/photos/reorder
  */
-router.put("/reorder", requireUser, async (req: any, res) => {
+router.put("/reorder", requireUser, async (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
+    const userId = (req as any).user?.id;
     const { order } = req.body;
 
-    if (!Array.isArray(order)) {
-      return res.status(400).json({ error: "Order must be array" });
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        photos: {
-          set: order,
+    if (!Array.isArray(order)) {
+      return res.status(400).json({ error: "Invalid order data" });
+    }
+
+    for (let i = 0; i < order.length; i++) {
+      await prisma.photo.updateMany({
+        where: {
+          userId,
+          url: order[i],
         },
-      },
+        data: {
+          order: i,
+        },
+      });
+    }
+
+    const photos = await prisma.photo.findMany({
+      where: { userId },
+      orderBy: { order: "asc" },
+      select: { url: true },
     });
 
-    return res.json({ success: true });
+    res.json({
+      success: true,
+      photos: photos.map((p) => p.url),
+    });
   } catch (err) {
-    console.error("PHOTO REORDER ERROR:", err);
-    return res.status(500).json({ error: "Failed to reorder photos" });
+    console.error("REORDER PHOTO ERROR:", err);
+
+    res.status(500).json({
+      error: "Failed to reorder photos",
+    });
   }
 });
 

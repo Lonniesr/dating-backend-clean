@@ -7,23 +7,33 @@ import { env } from "../../../config/env";
 const router = Router();
 
 router.post("/", async (req: Request, res: Response) => {
-  const { email, password, invite } = req.body as {
-    email?: string;
-    password?: string;
-    invite?: string;
-  };
-
   try {
+    const {
+      email,
+      password,
+      invite,
+      inviteCode,
+    } = req.body as {
+      email?: string;
+      password?: string;
+      invite?: string;
+      inviteCode?: string;
+    };
+
+    const inviteValue = invite || inviteCode;
+
     /* =========================
        VALIDATION
     ========================= */
 
-    if (!email || !password || !invite) {
-      return res.status(400).json({ message: "Missing required fields." });
+    if (!email || !password || !inviteValue) {
+      return res.status(400).json({
+        message: "Missing required fields.",
+      });
     }
 
     const inviteRecord = await prisma.invite.findUnique({
-      where: { code: invite },
+      where: { code: inviteValue },
     });
 
     if (!inviteRecord) {
@@ -43,7 +53,9 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     if (existingUser) {
-      return res.status(400).json({ message: "Email already registered." });
+      return res.status(400).json({
+        message: "Email already registered.",
+      });
     }
 
     /* =========================
@@ -69,7 +81,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     /* =========================
-       UPDATE INVITE (ANALYTICS)
+       UPDATE INVITE ANALYTICS
     ========================= */
 
     await prisma.invite.update({
@@ -88,32 +100,41 @@ router.post("/", async (req: Request, res: Response) => {
 
     const token = jwt.sign(
       {
-        sub: user.id,
+        id: user.id,
         role: user.role,
       },
       env.JWT_SECRET,
-      { expiresIn: "7d" }
+      {
+        expiresIn: "7d",
+      }
     );
 
     /* =========================
-       COOKIE CONFIG (FIXED)
+       COOKIE CONFIG
     ========================= */
 
     const isProduction = env.NODE_ENV === "production";
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: isProduction, // true only on HTTPS production
-      sameSite: isProduction ? "none" : "lax", // lax for localhost
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return res.json({ success: true, user });
+    return res.json({
+      success: true,
+      user,
+    });
 
   } catch (error) {
     console.error("SIGNUP ERROR:", error);
-    return res.status(500).json({ success: false });
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 

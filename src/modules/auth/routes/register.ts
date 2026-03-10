@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import prisma from "../../../prisma";
 import { env } from "../../../config/env";
 
@@ -31,7 +32,6 @@ router.post("/", async (req: Request, res: Response) => {
 
     let invite = null;
 
-    // 🔥 Validate invite if provided
     if (inviteCode) {
       invite = await prisma.invite.findUnique({
         where: { code: inviteCode },
@@ -67,7 +67,6 @@ router.post("/", async (req: Request, res: Response) => {
       },
     });
 
-    // 🔥 If invite used → update analytics
     if (invite) {
       await prisma.invite.update({
         where: { id: invite.id },
@@ -80,8 +79,27 @@ router.post("/", async (req: Request, res: Response) => {
       });
     }
 
-    return res.status(201).json({ user });
+    /**
+     * Create JWT session
+     */
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      env.JWT_SECRET,
+      { expiresIn: "30d" }
+    );
 
+    /**
+     * Set auth cookie
+     */
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: env.NODE_ENV === "production",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
+
+    return res.status(201).json({ user });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     return res.status(500).json({ error: "Server error" });

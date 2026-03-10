@@ -15,8 +15,6 @@ router.post("/", async (req, res) => {
     console.log("Admin raw body:", req.body);
     try {
         const { email, password } = req.body;
-        console.log("Admin email:", email);
-        console.log("Admin password:", password);
         if (!email || !password) {
             return res.status(400).json({ error: "Email and password required" });
         }
@@ -25,10 +23,14 @@ router.post("/", async (req, res) => {
         }
         const admin = await prisma_1.default.admin.findUnique({
             where: { email },
-            select: { id: true, email: true, password: true, userId: true },
+            select: {
+                id: true,
+                email: true,
+                password: true,
+                userId: true,
+            },
         });
         console.log("Admin found:", admin === null || admin === void 0 ? void 0 : admin.email);
-        console.log("Stored admin hash:", admin === null || admin === void 0 ? void 0 : admin.password);
         if (!admin) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
@@ -37,20 +39,33 @@ router.post("/", async (req, res) => {
         if (!ok) {
             return res.status(401).json({ error: "Invalid credentials" });
         }
+        /* =========================
+           CREATE JWT
+        ========================= */
         const token = jsonwebtoken_1.default.sign({
-            id: admin.id,
+            sub: admin.id,
             role: "admin",
             email: admin.email,
             userId: (_a = admin.userId) !== null && _a !== void 0 ? _a : null,
         }, env_1.env.JWT_SECRET, { expiresIn: "7d" });
+        /* =========================
+           SET AUTH COOKIE
+        ========================= */
         res.cookie("token", token, {
             httpOnly: true,
-            secure: env_1.env.NODE_ENV === "production",
-            sameSite: env_1.env.NODE_ENV === "production" ? "none" : "lax",
+            secure: true, // required for cross-site cookies
+            sameSite: "none", // required for different subdomains
+            domain: ".letslynq.com", // allows letslynq.com + api.letslynq.com
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: "/",
         });
-        return res.json({ ok: true, admin: { id: admin.id, email: admin.email } });
+        return res.json({
+            ok: true,
+            admin: {
+                id: admin.id,
+                email: admin.email,
+            },
+        });
     }
     catch (err) {
         console.error("Admin login error:", err);

@@ -9,7 +9,6 @@ const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 /**
  * GET /api/profile
- * Returns authenticated user profile
  */
 router.get("/", requireUser_1.requireUser, async (req, res) => {
     var _a;
@@ -18,56 +17,49 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const profile = await prisma_1.default.user.findUnique({
+        const user = await prisma_1.default.user.findUnique({
             where: { id: userId },
-            select: {
-                id: true,
-                email: true,
-                role: true,
-                name: true,
-                username: true,
-                birthdate: true,
-                age: true,
-                gender: true,
-                race: true,
-                bio: true,
-                birthplace: true,
-                location: true,
-                latitude: true,
-                longitude: true,
-                photos: true,
-                prompts: true,
-                preferences: true,
-                verified: true,
-                verification_status: true,
-                onboardingComplete: true,
-                lastActiveAt: true,
-            },
         });
-        if (!profile) {
+        if (!user) {
             return res.status(404).json({ error: "Profile not found" });
         }
-        /**
-         * Safety layer to avoid frontend crashes
-         */
+        const photos = await prisma_1.default.photo.findMany({
+            where: { userId },
+            orderBy: { order: "asc" },
+            select: { url: true },
+        });
         const safeProfile = {
-            ...profile,
-            photos: profile.photos || [],
-            prompts: profile.prompts || {},
-            preferences: profile.preferences || {},
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+            username: user.username,
+            birthdate: user.birthdate,
+            age: user.age,
+            gender: user.gender,
+            race: user.race,
+            bio: user.bio,
+            birthplace: user.birthplace,
+            location: user.location,
+            latitude: user.latitude,
+            longitude: user.longitude,
+            photos: photos.map((p) => p.url),
+            prompts: user.prompts || {},
+            preferences: user.preferences || {},
+            verified: user.verified,
+            verification_status: user.verification_status,
+            onboardingComplete: user.onboardingComplete,
+            lastActiveAt: user.lastActiveAt,
         };
         return res.json(safeProfile);
     }
     catch (err) {
         console.error("PROFILE FETCH ERROR:", err);
-        return res.status(500).json({
-            error: "Server error",
-        });
+        return res.status(500).json({ error: "Server error" });
     }
 });
 /**
  * POST /api/profile/location
- * Save user GPS coordinates
  */
 router.post("/location", requireUser_1.requireUser, async (req, res) => {
     var _a;
@@ -102,9 +94,7 @@ router.post("/location", requireUser_1.requireUser, async (req, res) => {
     }
     catch (err) {
         console.error("LOCATION SAVE ERROR:", err);
-        return res.status(500).json({
-            error: "Server error",
-        });
+        return res.status(500).json({ error: "Server error" });
     }
 });
 exports.default = router;

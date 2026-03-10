@@ -5,7 +5,7 @@ import { requireUser } from "../../../middleware/requireUser";
 const router = Router();
 
 /**
- * Distance calculator (miles)
+ * Calculate distance in miles using Haversine formula
  */
 function calculateDistance(
   lat1: number,
@@ -43,7 +43,7 @@ router.get(
       }
 
       /**
-       * Current user
+       * Load current user
        */
       const currentUser = await prisma.user.findUnique({
         where: { id: userId },
@@ -57,7 +57,7 @@ router.get(
       });
 
       if (!currentUser) {
-        return res.status(404).json({ message: "User not found." });
+        return res.status(404).json({ message: "User not found" });
       }
 
       const prefs =
@@ -94,6 +94,11 @@ router.get(
         .filter((id) => id !== userId);
 
       /**
+       * Prevent large notIn queries
+       */
+      const excludedIds = [...swipedIds, ...matchedIds].slice(0, 500);
+
+      /**
        * Age filtering
        */
       const today = new Date();
@@ -123,14 +128,17 @@ router.get(
       const whereClause: any = {
         id: {
           not: userId,
-          notIn: [...swipedIds, ...matchedIds],
+          notIn: excludedIds,
         },
 
         onboardingComplete: true,
         banned: false,
 
+        /**
+         * ensure users have at least 1 photo
+         */
         photos: {
-          isEmpty: false,
+          some: {},
         },
       };
 
@@ -160,7 +168,7 @@ router.get(
       }
 
       /**
-       * Initial candidate pool
+       * Fetch candidates
        */
       const candidates = await prisma.user.findMany({
         where: whereClause,
@@ -170,43 +178,49 @@ router.get(
           name: true,
           gender: true,
           race: true,
-          photos: true,
           birthdate: true,
           location: true,
           latitude: true,
           longitude: true,
           lastActiveAt: true,
+
+          photos: {
+            select: { url: true },
+            orderBy: { order: "asc" },
+          },
         },
 
-        take: 60,
+        take: 80,
       });
 
       /**
-       * Radius filtering
+       * Location filtering
        */
       let filtered = candidates;
 
       if (
         prefs.locationRadius &&
-        currentUser.latitude &&
-        currentUser.longitude
+        currentUser.latitude !== null &&
+        currentUser.longitude !== null
       ) {
         filtered = candidates.filter((user) => {
-          if (!user.latitude || !user.longitude) return false;
+          if (user.latitude === null || user.longitude === null) {
+            return false;
+          }
 
-          const distance = calculateDistance(
-            currentUser.latitude!,
-            currentUser.longitude!,
-            user.latitude,
-            user.longitude
+          const d = calculateDistance(
+            currentUser.latitude as number,
+            currentUser.longitude as number,
+            user.latitude as number,
+            user.longitude as number
           );
 
-          return distance <= prefs.locationRadius;
+          return d <= prefs.locationRadius;
         });
       }
 
       /**
-       * Activity ranking
+       * Rank by activity
        */
       const ranked = filtered.sort((a, b) => {
         const aTime = a.lastActiveAt
@@ -220,12 +234,21 @@ router.get(
         return bTime - aTime;
       });
 
-      res.json(ranked.slice(0, 30));
+      /**
+       * Convert photo relation → string[]
+       */
+      const formatted = ranked.slice(0, 30).map((u) => ({
+        ...u,
+        photos: u.photos?.map((p) => p.url) ?? [],
+      }));
+
+      return res.json(formatted);
+
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
 
-      res.status(500).json({
-        message: "Failed to load discover feed.",
+      return res.status(500).json({
+        message: "Failed to load discover feed",
       });
     }
   }

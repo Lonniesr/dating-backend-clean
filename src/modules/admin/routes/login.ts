@@ -18,9 +18,6 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body as AdminLoginBody;
 
-    console.log("Admin email:", email);
-    console.log("Admin password:", password);
-
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password required" });
     }
@@ -31,26 +28,35 @@ router.post("/", async (req: Request, res: Response) => {
 
     const admin = await prisma.admin.findUnique({
       where: { email },
-      select: { id: true, email: true, password: true, userId: true },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        userId: true,
+      },
     });
 
     console.log("Admin found:", admin?.email);
-    console.log("Stored admin hash:", admin?.password);
 
     if (!admin) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const ok = await bcrypt.compare(password, admin.password);
+
     console.log("Admin password match:", ok);
 
     if (!ok) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    /* =========================
+       CREATE JWT
+    ========================= */
+
     const token = jwt.sign(
       {
-        id: admin.id,
+        sub: admin.id,
         role: "admin",
         email: admin.email,
         userId: admin.userId ?? null,
@@ -59,15 +65,27 @@ router.post("/", async (req: Request, res: Response) => {
       { expiresIn: "7d" }
     );
 
+    /* =========================
+       SET AUTH COOKIE
+    ========================= */
+
     res.cookie("token", token, {
       httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+      secure: true,               // required for cross-site cookies
+      sameSite: "none",           // required for different subdomains
+      domain: ".letslynq.com",    // allows letslynq.com + api.letslynq.com
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: "/",
     });
 
-    return res.json({ ok: true, admin: { id: admin.id, email: admin.email } });
+    return res.json({
+      ok: true,
+      admin: {
+        id: admin.id,
+        email: admin.email,
+      },
+    });
+
   } catch (err) {
     console.error("Admin login error:", err);
     return res.status(500).json({ error: "Server error" });

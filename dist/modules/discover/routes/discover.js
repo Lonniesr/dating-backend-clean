@@ -8,7 +8,7 @@ const prisma_1 = __importDefault(require("../../../prisma"));
 const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 /**
- * Distance calculator (miles)
+ * Calculate distance in miles using Haversine formula
  */
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 3958.8;
@@ -32,7 +32,7 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
         /**
-         * Current user
+         * Load current user
          */
         const currentUser = await prisma_1.default.user.findUnique({
             where: { id: userId },
@@ -45,7 +45,7 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
             },
         });
         if (!currentUser) {
-            return res.status(404).json({ message: "User not found." });
+            return res.status(404).json({ message: "User not found" });
         }
         const prefs = currentUser.preferences &&
             typeof currentUser.preferences === "object"
@@ -75,6 +75,10 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
             .flatMap((m) => [m.userAId, m.userBId])
             .filter((id) => id !== userId);
         /**
+         * Prevent large notIn queries
+         */
+        const excludedIds = [...swipedIds, ...matchedIds].slice(0, 500);
+        /**
          * Age filtering
          */
         const today = new Date();
@@ -92,12 +96,15 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
         const whereClause = {
             id: {
                 not: userId,
-                notIn: [...swipedIds, ...matchedIds],
+                notIn: excludedIds,
             },
             onboardingComplete: true,
             banned: false,
+            /**
+             * ensure users have at least 1 photo
+             */
             photos: {
-                isEmpty: false,
+                some: {},
             },
         };
         /**
@@ -124,7 +131,7 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
                 whereClause.birthdate.lte = maxBirthdate;
         }
         /**
-         * Initial candidate pool
+         * Fetch candidates
          */
         const candidates = await prisma_1.default.user.findMany({
             where: whereClause,
@@ -133,31 +140,35 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
                 name: true,
                 gender: true,
                 race: true,
-                photos: true,
                 birthdate: true,
                 location: true,
                 latitude: true,
                 longitude: true,
                 lastActiveAt: true,
+                photos: {
+                    select: { url: true },
+                    orderBy: { order: "asc" },
+                },
             },
-            take: 60,
+            take: 80,
         });
         /**
-         * Radius filtering
+         * Location filtering
          */
         let filtered = candidates;
         if (prefs.locationRadius &&
-            currentUser.latitude &&
-            currentUser.longitude) {
+            currentUser.latitude !== null &&
+            currentUser.longitude !== null) {
             filtered = candidates.filter((user) => {
-                if (!user.latitude || !user.longitude)
+                if (user.latitude === null || user.longitude === null) {
                     return false;
-                const distance = calculateDistance(currentUser.latitude, currentUser.longitude, user.latitude, user.longitude);
-                return distance <= prefs.locationRadius;
+                }
+                const d = calculateDistance(currentUser.latitude, currentUser.longitude, user.latitude, user.longitude);
+                return d <= prefs.locationRadius;
             });
         }
         /**
-         * Activity ranking
+         * Rank by activity
          */
         const ranked = filtered.sort((a, b) => {
             const aTime = a.lastActiveAt
@@ -168,12 +179,22 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
                 : 0;
             return bTime - aTime;
         });
-        res.json(ranked.slice(0, 30));
+        /**
+         * Convert photo relation → string[]
+         */
+        const formatted = ranked.slice(0, 30).map((u) => {
+            var _a, _b;
+            return ({
+                ...u,
+                photos: (_b = (_a = u.photos) === null || _a === void 0 ? void 0 : _a.map((p) => p.url)) !== null && _b !== void 0 ? _b : [],
+            });
+        });
+        return res.json(formatted);
     }
     catch (err) {
         console.error("DISCOVER ERROR:", err);
-        res.status(500).json({
-            message: "Failed to load discover feed.",
+        return res.status(500).json({
+            message: "Failed to load discover feed",
         });
     }
 });

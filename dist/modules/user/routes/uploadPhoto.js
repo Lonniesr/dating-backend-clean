@@ -5,6 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = uploadPhoto;
 const prisma_1 = __importDefault(require("../../../prisma"));
+/**
+ * POST /api/user/photos/upload
+ * Save photo URL after it has already been uploaded to storage
+ */
 async function uploadPhoto(req, res) {
     var _a;
     try {
@@ -12,30 +16,43 @@ async function uploadPhoto(req, res) {
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded" });
+        const { url } = req.body;
+        if (!url || typeof url !== "string") {
+            return res.status(400).json({ error: "Invalid photo URL" });
         }
-        const filePath = `/uploads/photos/${req.file.filename}`;
+        /**
+         * Get current photo count to determine order
+         */
         const count = await prisma_1.default.photo.count({
             where: { userId },
         });
+        /**
+         * Save photo record
+         */
         await prisma_1.default.photo.create({
             data: {
-                url: filePath,
-                order: count,
                 userId,
+                url,
+                order: count,
             },
         });
+        /**
+         * Return updated photo list
+         */
         const photos = await prisma_1.default.photo.findMany({
             where: { userId },
             orderBy: { order: "asc" },
+            select: { url: true },
         });
         return res.json({
+            success: true,
             photos: photos.map((p) => p.url),
         });
     }
     catch (err) {
         console.error("UPLOAD PHOTO ERROR:", err);
-        return res.status(500).json({ error: "Server error" });
+        return res.status(500).json({
+            error: "Failed to save photo",
+        });
     }
 }

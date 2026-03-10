@@ -13,7 +13,9 @@ const router = Router();
 
 router.post("/", async (req, res) => {
   try {
+
     const { email, password } = req.body;
+
     if (!email || !password) {
       return res.status(400).json({ error: "Invalid credentials" });
     }
@@ -30,6 +32,7 @@ router.post("/", async (req, res) => {
     }
 
     const valid = await bcrypt.compare(password, user.password);
+
     if (!valid) {
       await registerFailure(email, "user");
       return res.status(401).json({ error: "Invalid credentials" });
@@ -37,11 +40,19 @@ router.post("/", async (req, res) => {
 
     await resetFailures(email, "user");
 
-    // 🔐 CLEAN JWT (database is source of truth)
+    /* =========================
+       ISSUE JWT
+    ========================= */
+
     const token = jwt.sign(
-      { sub: user.id },
+      {
+        id: user.id,
+        role: user.role,
+      },
       env.JWT_SECRET,
-      { expiresIn: "7d" }
+      {
+        expiresIn: "7d",
+      }
     );
 
     res.cookie("token", token, {
@@ -52,9 +63,17 @@ router.post("/", async (req, res) => {
       path: "/",
     });
 
-    return res.json({ ok: true });
-  } catch {
-    return res.status(500).json({ error: "Server error" });
+    return res.json({
+      success: true,
+    });
+
+  } catch (err) {
+
+    console.error("LOGIN ERROR:", err);
+
+    return res.status(500).json({
+      error: "Server error",
+    });
   }
 });
 

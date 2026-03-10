@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import prisma from "../prisma";
-import { env } from "./../config/env";
+import { env } from "../config/env";
 
 /* =========================
    AUTH USER TYPE
@@ -50,19 +50,22 @@ function getToken(req: Request): string | undefined {
 }
 
 /* =========================
-   JWT PAYLOAD EXTRACTION
+   EXTRACT USER ID FROM JWT
 ========================= */
 
 function getUserIdFromPayload(
   payload: string | JwtPayload
 ): string | undefined {
+
   if (typeof payload === "string") return undefined;
 
+  /* support both old and new tokens */
   if (typeof payload.sub === "string" && payload.sub) {
     return payload.sub;
   }
 
   const maybeId = (payload as any).id;
+
   if (typeof maybeId === "string" && maybeId) {
     return maybeId;
   }
@@ -71,7 +74,7 @@ function getUserIdFromPayload(
 }
 
 /* =========================
-   REQUIRE USER MIDDLEWARE
+   REQUIRE USER
 ========================= */
 
 export async function requireUser(
@@ -79,7 +82,9 @@ export async function requireUser(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+
   try {
+
     const token = getToken(req);
 
     if (!token) {
@@ -88,6 +93,7 @@ export async function requireUser(
     }
 
     const decoded = jwt.verify(token, env.JWT_SECRET);
+
     const userId = getUserIdFromPayload(decoded);
 
     if (!userId) {
@@ -117,9 +123,15 @@ export async function requireUser(
        ONBOARDING GUARD
     ========================== */
 
-    const isOnboardingRoute = req.originalUrl.startsWith("/api/onboarding");
+    const path = req.originalUrl;
 
-    if (!user.onboardingComplete && !isOnboardingRoute) {
+    const allowedBeforeOnboarding =
+      path.startsWith("/api/onboarding") ||
+      path.startsWith("/api/profile") ||
+      path.startsWith("/api/auth") ||
+      path.startsWith("/api/user/photos");
+
+    if (!user.onboardingComplete && !allowedBeforeOnboarding) {
       res.status(403).json({
         error: "Onboarding incomplete",
         onboardingRequired: true,
@@ -128,9 +140,13 @@ export async function requireUser(
     }
 
     req.user = user;
+
     next();
+
   } catch (err) {
+
     console.error("AUTH ERROR:", err);
+
     res.status(401).json({ error: "Unauthorized" });
   }
 }

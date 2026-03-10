@@ -11,7 +11,9 @@ router.get(
   "/",
   requireUser,
   async (req: Request & { user?: any }, res: Response) => {
+
     try {
+
       const userId = req.user?.id;
 
       if (!userId) {
@@ -32,7 +34,7 @@ router.get(
         select: { url: true },
       });
 
-      const safeProfile = {
+      const profile = {
         id: user.id,
         email: user.email,
         role: user.role,
@@ -65,11 +67,15 @@ router.get(
         lastActiveAt: user.lastActiveAt,
       };
 
-      return res.json(safeProfile);
+      return res.json(profile);
 
     } catch (err) {
+
       console.error("PROFILE FETCH ERROR:", err);
-      return res.status(500).json({ error: "Server error" });
+
+      return res.status(500).json({
+        error: "Server error",
+      });
     }
   }
 );
@@ -81,7 +87,9 @@ router.post(
   "/location",
   requireUser,
   async (req: Request & { user?: any }, res: Response) => {
+
     try {
+
       const userId = req.user?.id;
 
       if (!userId) {
@@ -117,8 +125,12 @@ router.post(
       });
 
     } catch (err) {
+
       console.error("LOCATION SAVE ERROR:", err);
-      return res.status(500).json({ error: "Server error" });
+
+      return res.status(500).json({
+        error: "Server error",
+      });
     }
   }
 );

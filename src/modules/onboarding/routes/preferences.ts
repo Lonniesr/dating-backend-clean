@@ -11,11 +11,18 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
     }
 
     const userId = req.user.id;
-    const { preferences } = req.body;
 
-    if (!preferences || typeof preferences !== "object") {
-      return res.status(400).json({ error: "Preferences required" });
-    }
+    /* ======================================
+       ACCEPT BOTH BODY FORMATS
+       { preferences: {...} }
+       OR
+       { interestedIn, minAge, ... }
+    ====================================== */
+
+    const payload =
+      req.body.preferences && typeof req.body.preferences === "object"
+        ? req.body.preferences
+        : req.body;
 
     let {
       interestedIn,
@@ -23,7 +30,7 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       minAge,
       maxAge,
       locationRadius,
-    } = preferences;
+    } = payload;
 
     /* ==============================
        VALIDATION
@@ -110,6 +117,7 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
     });
 
     return res.json({
+      success: true,
       user: updatedUser,
     });
 

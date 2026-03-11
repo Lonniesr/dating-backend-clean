@@ -12,34 +12,15 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
 
     const userId = req.user.id;
 
-    /* ======================================
-       ACCEPT BOTH BODY FORMATS
-       { preferences: {...} }
-       OR
-       { interestedIn, minAge, ... }
-    ====================================== */
-
     const payload =
       req.body.preferences && typeof req.body.preferences === "object"
         ? req.body.preferences
         : req.body;
 
-    let {
-      interestedIn,
-      racePreference,
-      minAge,
-      maxAge,
-      locationRadius,
-    } = payload;
-
-    /* ==============================
-       VALIDATION
-    ============================== */
+    let { interestedIn, racePreference, minAge, maxAge, locationRadius } = payload;
 
     if (!interestedIn || typeof interestedIn !== "string") {
-      return res.status(400).json({
-        error: "interestedIn is required",
-      });
+      return res.status(400).json({ error: "interestedIn is required" });
     }
 
     minAge = Number(minAge);
@@ -52,30 +33,18 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       maxAge > 100 ||
       minAge >= maxAge
     ) {
-      return res.status(400).json({
-        error: "Invalid age range",
-      });
+      return res.status(400).json({ error: "Invalid age range" });
     }
 
-    if (locationRadius !== null && locationRadius !== undefined) {
+    if (locationRadius !== undefined && locationRadius !== null) {
       locationRadius = Number(locationRadius);
 
-      if (
-        Number.isNaN(locationRadius) ||
-        locationRadius < 5 ||
-        locationRadius > 100
-      ) {
-        return res.status(400).json({
-          error: "Invalid location radius",
-        });
+      if (Number.isNaN(locationRadius) || locationRadius < 5 || locationRadius > 100) {
+        return res.status(400).json({ error: "Invalid location radius" });
       }
     } else {
       locationRadius = null;
     }
-
-    /* ==============================
-       LOAD EXISTING PREFERENCES
-    ============================== */
 
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
@@ -83,20 +52,13 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
     });
 
     if (!currentUser) {
-      return res.status(404).json({
-        error: "User not found",
-      });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const existingPreferences =
-      currentUser.preferences &&
-      typeof currentUser.preferences === "object"
+      currentUser.preferences && typeof currentUser.preferences === "object"
         ? (currentUser.preferences as Record<string, any>)
         : {};
-
-    /* ==============================
-       UPDATE USER
-    ============================== */
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },

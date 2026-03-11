@@ -24,18 +24,12 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
     } = req.body;
 
     /* =========================
-       DEBUG LOGS
-    ========================= */
-
-    console.log("BIO RECEIVED FROM FRONTEND:", bio);
-
-    /* =========================
        VALIDATION
     ========================= */
 
     if (!name || !birthdate || !gender || !race) {
       return res.status(400).json({
-        message: "Name, birthdate, gender, and race are required.",
+        error: "Name, birthdate, gender, and race are required.",
       });
     }
 
@@ -51,7 +45,7 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
 
     if (!validRaces.includes(race)) {
       return res.status(400).json({
-        message: "Invalid race value.",
+        error: "Invalid race value.",
       });
     }
 
@@ -59,7 +53,7 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
 
     if (isNaN(parsedBirthdate.getTime())) {
       return res.status(400).json({
-        message: "Invalid birthdate format.",
+        error: "Invalid birthdate format.",
       });
     }
 
@@ -85,22 +79,16 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
         name: name.trim(),
         birthdate: parsedBirthdate,
         age,
-
         gender,
         race,
-
-        bio: bio?.trim() || null,
-        birthplace: birthplace?.trim() || null,
-
-        latitude:
-          latitude !== undefined && latitude !== null
-            ? Number(latitude)
-            : null,
-
-        longitude:
-          longitude !== undefined && longitude !== null
-            ? Number(longitude)
-            : null,
+        ...(bio !== undefined && { bio: bio?.trim() || null }),
+        ...(birthplace !== undefined && { birthplace: birthplace?.trim() || null }),
+        ...(latitude !== undefined && {
+          latitude: latitude !== null ? Number(latitude) : null,
+        }),
+        ...(longitude !== undefined && {
+          longitude: longitude !== null ? Number(longitude) : null,
+        }),
       },
       select: {
         id: true,
@@ -115,8 +103,6 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
         longitude: true,
       },
     });
-
-    console.log("BIO SAVED TO DB:", updatedUser.bio);
 
     return res.status(200).json({
       success: true,

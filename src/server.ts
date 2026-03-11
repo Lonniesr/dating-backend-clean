@@ -50,7 +50,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   CORS (FIXED FOR LOCAL + PROD)
+   CORS (FIXED FOR VERCEL)
 ========================= */
 
 const allowedOrigins = (env.CORS_ORIGIN || "")
@@ -63,7 +63,7 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
-      /* Always allow localhost for development */
+      /* Allow localhost dev */
       if (
         origin.startsWith("http://localhost") ||
         origin.startsWith("http://127.0.0.1")
@@ -71,7 +71,12 @@ app.use(
         return callback(null, true);
       }
 
-      /* Allow production domains */
+      /* Allow Vercel preview deployments */
+      if (origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+
+      /* Allow configured production domains */
       const allowed = allowedOrigins.some((o) =>
         origin.startsWith(o)
       );
@@ -166,7 +171,20 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 export const io = new SocketIOServer(server, {
   cors: {
-    origin: allowedOrigins.length ? allowedOrigins : true,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      if (
+        origin.startsWith("http://localhost") ||
+        origin.startsWith("http://127.0.0.1") ||
+        origin.endsWith(".vercel.app") ||
+        allowedOrigins.some((o) => origin.startsWith(o))
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   },
 });

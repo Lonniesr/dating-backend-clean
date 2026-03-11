@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 
@@ -7,24 +7,26 @@ const router = Router();
 /**
  * POST /api/swipe
  */
-router.post("/", requireUser, async (req, res) => {
+router.post("/", requireUser, async (req: Request & { user?: any }, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const swiperId = req.user?.id;
+
+    if (!swiperId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const swiperId = req.user.id;
     const { targetId, liked, superLike } = req.body;
 
-    if (!targetId) {
-      return res.status(400).json({ message: "Missing targetId" });
+    if (!targetId || typeof targetId !== "string") {
+      return res.status(400).json({ error: "Invalid targetId" });
     }
 
     if (targetId === swiperId) {
-      return res.status(400).json({ message: "Cannot swipe yourself" });
+      return res.status(400).json({ error: "Cannot swipe yourself" });
     }
 
     const isSuperLike = superLike === true;
+    const isLiked = liked === true;
 
     /**
      * Handle super like limits
@@ -39,7 +41,7 @@ router.post("/", requireUser, async (req, res) => {
       });
 
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404).json({ error: "User not found" });
       }
 
       let remaining = user.superLikesRemaining ?? 0;
@@ -54,14 +56,14 @@ router.post("/", requireUser, async (req, res) => {
           where: { id: swiperId },
           data: {
             superLikesRemaining: 3,
-            superLikesResetAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+            superLikesResetAt: new Date(now.getTime() + 86400000),
           },
         });
       }
 
       if (remaining <= 0) {
         return res.status(403).json({
-          message: "No super likes remaining",
+          error: "No super likes remaining",
         });
       }
 
@@ -76,7 +78,7 @@ router.post("/", requireUser, async (req, res) => {
     }
 
     /**
-     * Prevent duplicate swipe
+     * Prevent duplicate swipes
      */
     const existingSwipe = await prisma.swipe.findUnique({
       where: {
@@ -92,7 +94,7 @@ router.post("/", requireUser, async (req, res) => {
         data: {
           swiperId,
           targetId,
-          liked: liked === true,
+          liked: isLiked,
           superLike: isSuperLike,
         },
       });
@@ -111,18 +113,12 @@ router.post("/", requireUser, async (req, res) => {
 
     let isMatch = false;
 
-    if (liked === true && reciprocal) {
+    if (isLiked && reciprocal) {
       const existingMatch = await prisma.match.findFirst({
         where: {
           OR: [
-            {
-              userAId: swiperId,
-              userBId: targetId,
-            },
-            {
-              userAId: targetId,
-              userBId: swiperId,
-            },
+            { userAId: swiperId, userBId: targetId },
+            { userAId: targetId, userBId: swiperId },
           ],
         },
       });
@@ -139,15 +135,16 @@ router.post("/", requireUser, async (req, res) => {
       isMatch = true;
     }
 
-    res.json({
+    return res.json({
       success: true,
       isMatch,
     });
+
   } catch (err) {
     console.error("SWIPE ERROR:", err);
 
-    res.status(500).json({
-      message: "Swipe failed",
+    return res.status(500).json({
+      error: "Swipe failed",
     });
   }
 });

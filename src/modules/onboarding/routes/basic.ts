@@ -24,6 +24,12 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
     } = req.body;
 
     /* =========================
+       DEBUG LOGS
+    ========================= */
+
+    console.log("BIO RECEIVED FROM FRONTEND:", bio);
+
+    /* =========================
        VALIDATION
     ========================= */
 
@@ -109,6 +115,8 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
         longitude: true,
       },
     });
+
+    console.log("BIO SAVED TO DB:", updatedUser.bio);
 
     return res.status(200).json({
       success: true,

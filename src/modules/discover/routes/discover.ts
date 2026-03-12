@@ -67,7 +67,7 @@ router.get(
           : {};
 
       /**
-       * Swiped users
+       * Users YOU swiped
        */
       const swipes = await prisma.swipe.findMany({
         where: { swiperId: userId },
@@ -77,7 +77,17 @@ router.get(
       const swipedIds = swipes.map((s) => s.targetId);
 
       /**
-       * Matched users
+       * Users who swiped YOU
+       */
+      const swipedYou = await prisma.swipe.findMany({
+        where: { targetId: userId },
+        select: { swiperId: true },
+      });
+
+      const swipedYouIds = swipedYou.map((s) => s.swiperId);
+
+      /**
+       * Matches
        */
       const matches = await prisma.match.findMany({
         where: {
@@ -134,9 +144,6 @@ router.get(
         onboardingComplete: true,
         banned: false,
 
-        /**
-         * ensure users have at least 1 photo
-         */
         photos: {
           some: {},
         },
@@ -220,9 +227,18 @@ router.get(
       }
 
       /**
-       * Rank by activity
+       * PRIORITIZE USERS WHO LIKED YOU
        */
+      const likedYouSet = new Set(swipedYouIds);
+
       const ranked = filtered.sort((a, b) => {
+
+        const aLikedYou = likedYouSet.has(a.id);
+        const bLikedYou = likedYouSet.has(b.id);
+
+        if (aLikedYou && !bLikedYou) return -1;
+        if (!aLikedYou && bLikedYou) return 1;
+
         const aTime = a.lastActiveAt
           ? new Date(a.lastActiveAt).getTime()
           : 0;

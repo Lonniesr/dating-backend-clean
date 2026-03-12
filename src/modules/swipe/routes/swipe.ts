@@ -116,24 +116,31 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       });
 
       if (reciprocal) {
+        /**
+         * Always sort IDs so the match is unique
+         * Prevents A-B vs B-A duplicates
+         */
+
         const [userAId, userBId] =
           swiperId < targetId
             ? [swiperId, targetId]
             : [targetId, swiperId];
 
-        await prisma.match.upsert({
+        const existingMatch = await prisma.match.findFirst({
           where: {
-            userAId_userBId: {
-              userAId,
-              userBId,
-            },
-          },
-          update: {},
-          create: {
             userAId,
             userBId,
           },
         });
+
+        if (!existingMatch) {
+          await prisma.match.create({
+            data: {
+              userAId,
+              userBId,
+            },
+          });
+        }
 
         isMatch = true;
       }

@@ -25,12 +25,13 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       return res.status(400).json({ error: "Cannot swipe yourself" });
     }
 
-    const isSuperLike = superLike === true;
     const isLiked = liked === true;
+    const isSuperLike = superLike === true;
 
-    /**
-     * Handle super like limits
-     */
+    /* ===============================
+       HANDLE SUPER LIKE LIMIT
+    =============================== */
+
     if (isSuperLike) {
       const user = await prisma.user.findUnique({
         where: { id: swiperId },
@@ -45,11 +46,9 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       }
 
       let remaining = user.superLikesRemaining ?? 0;
-      let resetAt = user.superLikesResetAt;
-
       const now = new Date();
 
-      if (resetAt && now > resetAt) {
+      if (user.superLikesResetAt && now > user.superLikesResetAt) {
         remaining = 3;
 
         await prisma.user.update({
@@ -77,9 +76,10 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       });
     }
 
-    /**
-     * Prevent duplicate swipes
-     */
+    /* ===============================
+       PREVENT DUPLICATE SWIPES
+    =============================== */
+
     const existingSwipe = await prisma.swipe.findUnique({
       where: {
         swiperId_targetId: {
@@ -100,39 +100,43 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       });
     }
 
-    /**
-     * Check reciprocal swipe
-     */
-    const reciprocal = await prisma.swipe.findFirst({
-      where: {
-        swiperId: targetId,
-        targetId: swiperId,
-        liked: true,
-      },
-    });
+    /* ===============================
+       CHECK RECIPROCAL LIKE
+    =============================== */
 
     let isMatch = false;
 
-    if (isLiked && reciprocal) {
-      const existingMatch = await prisma.match.findFirst({
+    if (isLiked) {
+      const reciprocal = await prisma.swipe.findFirst({
         where: {
-          OR: [
-            { userAId: swiperId, userBId: targetId },
-            { userAId: targetId, userBId: swiperId },
-          ],
+          swiperId: targetId,
+          targetId: swiperId,
+          liked: true,
         },
       });
 
-      if (!existingMatch) {
-        await prisma.match.create({
-          data: {
-            userAId: swiperId,
-            userBId: targetId,
+      if (reciprocal) {
+        const [userAId, userBId] =
+          swiperId < targetId
+            ? [swiperId, targetId]
+            : [targetId, swiperId];
+
+        await prisma.match.upsert({
+          where: {
+            userAId_userBId: {
+              userAId,
+              userBId,
+            },
+          },
+          update: {},
+          create: {
+            userAId,
+            userBId,
           },
         });
-      }
 
-      isMatch = true;
+        isMatch = true;
+      }
     }
 
     return res.json({

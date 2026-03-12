@@ -184,8 +184,12 @@ model Match {
   userAId   String
   userBId   String
 
-  userA     User     @relation("Match_userA", fields: [userAId], references: [id])
-  userB     User     @relation("Match_userB", fields: [userBId], references: [id])
+  userA     User @relation("Match_userA", fields: [userAId], references: [id])
+  userB     User @relation("Match_userB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
 }
 
 model Message {

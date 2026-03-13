@@ -63,7 +63,6 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
-      /* Allow localhost dev */
       if (
         origin.startsWith("http://localhost") ||
         origin.startsWith("http://127.0.0.1")
@@ -71,12 +70,10 @@ app.use(
         return callback(null, true);
       }
 
-      /* Allow Vercel preview deployments */
       if (origin.endsWith(".vercel.app")) {
         return callback(null, true);
       }
 
-      /* Allow configured production domains */
       const allowed = allowedOrigins.some((o) =>
         origin.startsWith(o)
       );
@@ -225,10 +222,10 @@ async function start() {
     await setupRedis();
     registerSockets(io);
 
-    server.listen(env.PORT, () => {
-      console.log(
-        `🚀 Server running on port ${env.PORT} (${env.NODE_ENV})`
-      );
+    const PORT = env.PORT || 10000;
+
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 Server running on port ${PORT} (${env.NODE_ENV})`);
     });
   } catch (err) {
     console.error("Startup error:", err);

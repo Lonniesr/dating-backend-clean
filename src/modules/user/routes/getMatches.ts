@@ -3,7 +3,7 @@ import prisma from "../../../prisma";
 
 export default async function getMatches(req: Request, res: Response) {
   try {
-    const userId = req.user?.id;
+    const userId = (req as any).user?.id;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -41,11 +41,17 @@ export default async function getMatches(req: Request, res: Response) {
       const other =
         m.userAId === userId ? m.userB : m.userA;
 
+      const photos = Array.isArray(other.photos)
+        ? other.photos.map((p: any) =>
+            typeof p === "string" ? p : p?.url
+          ).filter(Boolean)
+        : [];
+
       return {
         id: other.id,
         name: other.name,
         gender: other.gender,
-        photo: other.photos?.[0] || null
+        photos
       };
     });
 

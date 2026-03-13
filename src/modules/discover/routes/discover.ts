@@ -5,7 +5,9 @@ import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-const DISCOVER_CACHE_TTL = 60; // seconds
+const DISCOVER_CACHE_TTL = 60;
+const PAGE_SIZE = 30;
+const BUFFER_SIZE = 60;
 
 function calculateDistance(
   lat1: number,
@@ -38,7 +40,9 @@ router.get(
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const cacheKey = `discover:${userId}`;
+      const cursor = Number(req.query.cursor || 0);
+
+      const cacheKey = `discover:${userId}:${cursor}`;
 
       /**
        * CACHE HIT
@@ -149,7 +153,7 @@ router.get(
           },
         },
 
-        take: 120,
+        take: 200,
       });
 
       /**
@@ -194,7 +198,13 @@ router.get(
         })
         .sort((a, b) => b.score - a.score);
 
-      const formatted = ranked.slice(0, 30).map((u) => ({
+      /**
+       * CURSOR WINDOW
+       */
+
+      const windowed = ranked.slice(cursor, cursor + BUFFER_SIZE);
+
+      const profiles = windowed.slice(0, PAGE_SIZE).map((u) => ({
         id: u.id,
         name: u.name,
         gender: u.gender,
@@ -206,15 +216,20 @@ router.get(
         photos: u.photos?.map((p) => p.url) ?? [],
       }));
 
+      const response = {
+        profiles,
+        nextCursor: cursor + PAGE_SIZE,
+      };
+
       /**
        * SAVE CACHE
        */
 
-      await redis.set(cacheKey, JSON.stringify(formatted), {
-  EX: DISCOVER_CACHE_TTL
-});
+      await redis.set(cacheKey, JSON.stringify(response), {
+        EX: DISCOVER_CACHE_TTL,
+      });
 
-      return res.json(formatted);
+      return res.json(response);
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
 

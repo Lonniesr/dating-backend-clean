@@ -1,7 +1,10 @@
 import { createClient } from "redis";
 
 const redis = createClient({
-  url: process.env.REDIS_URL
+  url: process.env.REDIS_URL,
+  socket: {
+    tls: true
+  }
 });
 
 redis.on("error", (err) => {
@@ -13,7 +16,7 @@ redis.on("error", (err) => {
     await redis.connect();
     console.log("✅ Redis connected");
   } catch (err) {
-    console.error("Redis connection failed:", err);
+    console.log("Redis unavailable (local dev)");
   }
 })();
 

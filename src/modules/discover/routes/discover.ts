@@ -41,7 +41,6 @@ router.get(
       }
 
       const cursor = Number(req.query.cursor || 0);
-
       const cacheKey = `discover:${userId}:${cursor}`;
 
       /**
@@ -50,7 +49,6 @@ router.get(
 
       if (redis) {
         const cached = await redis.get(cacheKey);
-
         if (cached) {
           return res.json(JSON.parse(cached));
         }
@@ -80,27 +78,35 @@ router.get(
           : {};
 
       /**
-       * USERS YOU SWIPED
+       * SWIPES (both directions)
        */
 
-      const swipes = await prisma.swipe.findMany({
-        where: { swiperId: userId },
-        select: { targetId: true },
+      const swipeData = await prisma.swipe.findMany({
+        where: {
+          OR: [
+            { swiperId: userId },
+            { targetId: userId }
+          ]
+        },
+        select: {
+          swiperId: true,
+          targetId: true,
+          liked: true
+        }
       });
 
-      const swipedIds = swipes.map((s) => s.targetId);
+      const swipedIds = new Set<string>();
+      const likedYouSet = new Set<string>();
 
-      /**
-       * USERS WHO LIKED YOU
-       */
+      for (const s of swipeData) {
+        if (s.swiperId === userId) {
+          swipedIds.add(s.targetId);
+        }
 
-      const swipedYou = await prisma.swipe.findMany({
-        where: { targetId: userId, liked: true },
-        select: { swiperId: true },
-      });
-
-      const likedYouIds = swipedYou.map((s) => s.swiperId);
-      const likedYouSet = new Set(likedYouIds);
+        if (s.targetId === userId && s.liked) {
+          likedYouSet.add(s.swiperId);
+        }
+      }
 
       /**
        * MATCHES
@@ -108,16 +114,26 @@ router.get(
 
       const matches = await prisma.match.findMany({
         where: {
-          OR: [{ userAId: userId }, { userBId: userId }],
+          OR: [{ userAId: userId }, { userBId: userId }]
         },
-        select: { userAId: true, userBId: true },
+        select: { userAId: true, userBId: true }
       });
 
-      const matchedIds = matches
-        .flatMap((m) => [m.userAId, m.userBId])
-        .filter((id) => id !== userId);
+      const matchedIds = new Set<string>();
 
-      const excludedIds = [...swipedIds, ...matchedIds].slice(0, 500);
+      for (const m of matches) {
+        if (m.userAId !== userId) matchedIds.add(m.userAId);
+        if (m.userBId !== userId) matchedIds.add(m.userBId);
+      }
+
+      /**
+       * EXCLUDED USERS
+       */
+
+      const excludedIds = [
+        ...Array.from(swipedIds),
+        ...Array.from(matchedIds)
+      ].slice(0, 500);
 
       /**
        * FETCH CANDIDATES
@@ -127,13 +143,13 @@ router.get(
         where: {
           id: {
             not: userId,
-            notIn: excludedIds,
+            notIn: excludedIds
           },
           onboardingComplete: true,
           banned: false,
           photos: {
-            some: {},
-          },
+            some: {}
+          }
         },
 
         select: {
@@ -150,11 +166,11 @@ router.get(
 
           photos: {
             select: { url: true },
-            orderBy: { order: "asc" },
-          },
+            orderBy: { order: "asc" }
+          }
         },
 
-        take: 300,
+        take: 300
       });
 
       /**
@@ -168,9 +184,8 @@ router.get(
           /* PRIORITIZE USERS WHO LIKED YOU */
           if (likedYouSet.has(user.id)) score += 500;
 
-          /* COMPATIBILITY SCORING */
+          /* GENDER COMPATIBILITY */
 
-          // Gender compatibility
           if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
             if (
               (prefs.interestedIn === "Men" && user.gender === "male") ||
@@ -182,7 +197,8 @@ router.get(
             }
           }
 
-          // Age compatibility
+          /* AGE COMPATIBILITY */
+
           if (user.birthdate) {
             const age =
               new Date().getFullYear() -
@@ -209,11 +225,11 @@ router.get(
             score += Math.max(0, 100 - hours);
           }
 
-          /* PHOTO COUNT BOOST */
+          /* PHOTO BOOST */
 
           score += (user.photos?.length || 0) * 10;
 
-          /* ELO ATTRACTIVENESS */
+          /* ELO BOOST */
 
           score += user.eloScore * 0.05;
 
@@ -235,7 +251,7 @@ router.get(
             score += Math.max(0, 50 - dist);
           }
 
-          /* RANDOMIZATION (prevents stale stacks) */
+          /* RANDOMIZATION */
 
           score += Math.random() * 10;
 
@@ -258,21 +274,21 @@ router.get(
         location: u.location,
         latitude: u.latitude,
         longitude: u.longitude,
-        photos: u.photos?.map((p) => p.url) ?? [],
+        photos: u.photos?.map((p) => p.url) ?? []
       }));
 
       const response = {
         profiles,
-        nextCursor: cursor + PAGE_SIZE,
+        nextCursor: cursor + PAGE_SIZE
       };
 
       /**
-       * SAVE CACHE
+       * CACHE
        */
 
       if (redis) {
         await redis.set(cacheKey, JSON.stringify(response), {
-          EX: DISCOVER_CACHE_TTL,
+          EX: DISCOVER_CACHE_TTL
         });
       }
 
@@ -282,7 +298,7 @@ router.get(
       console.error("DISCOVER ERROR:", err);
 
       return res.status(500).json({
-        message: "Failed to load discover feed",
+        message: "Failed to load discover feed"
       });
     }
   }

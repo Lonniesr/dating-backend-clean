@@ -210,12 +210,9 @@ router.get(
        * SAVE CACHE
        */
 
-      await redis.set(
-        cacheKey,
-        JSON.stringify(formatted),
-        "EX",
-        DISCOVER_CACHE_TTL
-      );
+      await redis.set(cacheKey, JSON.stringify(formatted), {
+  EX: DISCOVER_CACHE_TTL
+});
 
       return res.json(formatted);
     } catch (err) {

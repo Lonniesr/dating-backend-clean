@@ -11,6 +11,8 @@ export function registerChatSocket(io: Server) {
 
   nsp.use(socketAuth());
 
+  const onlineUsers = new Set<string>();
+
   nsp.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
@@ -21,7 +23,14 @@ export function registerChatSocket(io: Server) {
 
     console.log("💬 Chat connected:", userId);
 
+    onlineUsers.add(userId);
+
     socket.join(`user:${userId}`);
+
+    nsp.emit("presence:update", {
+      userId,
+      online: true,
+    });
 
     // =========================
     // JOIN CONVERSATION
@@ -39,10 +48,9 @@ export function registerChatSocket(io: Server) {
     socket.on(
       "message:send",
       async ({ receiverId, text }: { receiverId: string; text: string }) => {
-        if (!receiverId || !text || text.length === 0) return;
+        if (!receiverId || !text) return;
 
         try {
-          // Verify match
           const match = await prisma.match.findFirst({
             where: {
               OR: [
@@ -54,7 +62,6 @@ export function registerChatSocket(io: Server) {
 
           if (!match) return;
 
-          // Find conversation
           let conversation = await prisma.conversation.findFirst({
             where: {
               OR: [
@@ -93,11 +100,17 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
+          // Emit message
           nsp.to(room).emit("message:new", message);
 
+          // Update receiver conversation preview
           nsp.to(`user:${receiverId}`).emit("conversation:update", {
             conversationId: conversation.id,
+            message,
           });
+
+          // Trigger notification update
+          nsp.to(`user:${receiverId}`).emit("notifications:update");
         } catch (err) {
           console.error("CHAT MESSAGE ERROR:", err);
         }
@@ -128,7 +141,7 @@ export function registerChatSocket(io: Server) {
     });
 
     // =========================
-    // READ RECEIPT
+    // READ RECEIPTS
     // =========================
     socket.on("message:read", async ({ otherUserId }) => {
       if (!otherUserId) return;
@@ -147,10 +160,22 @@ export function registerChatSocket(io: Server) {
       nsp.to(room).emit("message:read:update", {
         readerId: userId,
       });
+
+      nsp.to(`user:${otherUserId}`).emit("notifications:update");
     });
 
+    // =========================
+    // DISCONNECT
+    // =========================
     socket.on("disconnect", () => {
       console.log("💬 Chat disconnected:", userId);
+
+      onlineUsers.delete(userId);
+
+      nsp.emit("presence:update", {
+        userId,
+        online: false,
+      });
     });
   });
 }

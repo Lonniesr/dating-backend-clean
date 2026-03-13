@@ -1,12 +1,12 @@
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
+import redis from "../../../redis";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-/**
- * Calculate distance in miles using Haversine formula
- */
+const DISCOVER_CACHE_TTL = 60; // seconds
+
 function calculateDistance(
   lat1: number,
   lon1: number,
@@ -38,14 +38,25 @@ router.get(
         return res.status(401).json({ message: "Unauthorized" });
       }
 
+      const cacheKey = `discover:${userId}`;
+
       /**
-       * Load current user
+       * CACHE HIT
        */
+
+      const cached = await redis.get(cacheKey);
+
+      if (cached) {
+        return res.json(JSON.parse(cached));
+      }
+
+      /**
+       * LOAD USER
+       */
+
       const currentUser = await prisma.user.findUnique({
         where: { id: userId },
         select: {
-          gender: true,
-          birthdate: true,
           preferences: true,
           latitude: true,
           longitude: true,
@@ -63,8 +74,9 @@ router.get(
           : {};
 
       /**
-       * Users YOU swiped
+       * USERS YOU SWIPED
        */
+
       const swipes = await prisma.swipe.findMany({
         where: { swiperId: userId },
         select: { targetId: true },
@@ -73,26 +85,26 @@ router.get(
       const swipedIds = swipes.map((s) => s.targetId);
 
       /**
-       * Users who swiped YOU
+       * USERS WHO LIKED YOU
        */
+
       const swipedYou = await prisma.swipe.findMany({
         where: { targetId: userId, liked: true },
         select: { swiperId: true },
       });
 
-      const swipedYouIds = swipedYou.map((s) => s.swiperId);
+      const likedYouIds = swipedYou.map((s) => s.swiperId);
+      const likedYouSet = new Set(likedYouIds);
 
       /**
-       * Matches
+       * MATCHES
        */
+
       const matches = await prisma.match.findMany({
         where: {
           OR: [{ userAId: userId }, { userBId: userId }],
         },
-        select: {
-          userAId: true,
-          userBId: true,
-        },
+        select: { userAId: true, userBId: true },
       });
 
       const matchedIds = matches
@@ -102,67 +114,23 @@ router.get(
       const excludedIds = [...swipedIds, ...matchedIds].slice(0, 500);
 
       /**
-       * Age filtering
+       * FETCH CANDIDATES
        */
-      const today = new Date();
 
-      let minBirthdate: Date | undefined;
-      let maxBirthdate: Date | undefined;
-
-      if (prefs.minAge) {
-        maxBirthdate = new Date(
-          today.getFullYear() - prefs.minAge,
-          today.getMonth(),
-          today.getDate()
-        );
-      }
-
-      if (prefs.maxAge) {
-        minBirthdate = new Date(
-          today.getFullYear() - prefs.maxAge,
-          today.getMonth(),
-          today.getDate()
-        );
-      }
-
-      /**
-       * Base query
-       */
-      const whereClause: any = {
-        id: {
-          not: userId,
-          notIn: excludedIds,
-        },
-
-        onboardingComplete: true,
-        banned: false,
-
-        photos: {
-          some: {},
-        },
-      };
-
-      if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
-        whereClause.gender =
-          prefs.interestedIn === "Men" ? "male" : "female";
-      }
-
-      if (prefs.racePreference && prefs.racePreference !== "Everyone") {
-        whereClause.race = prefs.racePreference;
-      }
-
-      if (minBirthdate || maxBirthdate) {
-        whereClause.birthdate = {};
-
-        if (minBirthdate) whereClause.birthdate.gte = minBirthdate;
-        if (maxBirthdate) whereClause.birthdate.lte = maxBirthdate;
-      }
-
-      /**
-       * Fetch candidates
-       */
       const candidates = await prisma.user.findMany({
-        where: whereClause,
+        where: {
+          id: {
+            not: userId,
+            notIn: excludedIds,
+          },
+
+          onboardingComplete: true,
+          banned: false,
+
+          photos: {
+            some: {},
+          },
+        },
 
         select: {
           id: true,
@@ -185,56 +153,25 @@ router.get(
       });
 
       /**
-       * Location filtering
+       * RANKING ALGORITHM
        */
-      let filtered = candidates;
 
-      if (
-        prefs.locationRadius &&
-        currentUser.latitude !== null &&
-        currentUser.longitude !== null
-      ) {
-        filtered = candidates.filter((user) => {
-          if (user.latitude === null || user.longitude === null) {
-            return false;
-          }
-
-          const d = calculateDistance(
-            currentUser.latitude as number,
-            currentUser.longitude as number,
-            user.latitude as number,
-            user.longitude as number
-          );
-
-          return d <= prefs.locationRadius;
-        });
-      }
-
-      const likedYouSet = new Set(swipedYouIds);
-
-      /**
-       * DISCOVER RANKING ALGORITHM
-       */
-      const ranked = filtered
+      const ranked = candidates
         .map((user) => {
           let score = 0;
 
-          /* Boost if they liked you */
           if (likedYouSet.has(user.id)) score += 500;
 
-          /* Activity boost */
           if (user.lastActiveAt) {
-            const hoursSinceActive =
+            const hours =
               (Date.now() - new Date(user.lastActiveAt).getTime()) /
               (1000 * 60 * 60);
 
-            score += Math.max(0, 100 - hoursSinceActive);
+            score += Math.max(0, 100 - hours);
           }
 
-          /* Photo count boost */
           score += (user.photos?.length || 0) * 10;
 
-          /* Distance boost */
           if (
             currentUser.latitude &&
             currentUser.longitude &&
@@ -251,16 +188,12 @@ router.get(
             score += Math.max(0, 50 - dist);
           }
 
-          /* Randomization */
-          score += Math.random() * 15;
+          score += Math.random() * 10;
 
           return { ...user, score };
         })
         .sort((a, b) => b.score - a.score);
 
-      /**
-       * Convert photos → string[]
-       */
       const formatted = ranked.slice(0, 30).map((u) => ({
         id: u.id,
         name: u.name,
@@ -273,8 +206,18 @@ router.get(
         photos: u.photos?.map((p) => p.url) ?? [],
       }));
 
-      return res.json(formatted);
+      /**
+       * SAVE CACHE
+       */
 
+      await redis.set(
+        cacheKey,
+        JSON.stringify(formatted),
+        "EX",
+        DISCOVER_CACHE_TTL
+      );
+
+      return res.json(formatted);
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
 

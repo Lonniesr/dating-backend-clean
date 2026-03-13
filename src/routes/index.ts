@@ -22,6 +22,9 @@ import matchCountRoutes from "../modules/user/routes/matchCount";
 import statsRoutes from "../modules/user/routes/stats";
 import photosRouter from "../modules/user/routes/photos";
 
+/* 🔔 NEW NOTIFICATION ROUTE */
+import notificationsRoutes from "../modules/user/routes/notifications";
+
 /* =========================
    VERIFICATION ROUTES
 ========================= */
@@ -73,6 +76,9 @@ router.use("/user/photos", photosRouter);
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);
+
+/* 🔔 NOTIFICATIONS (navbar badges) */
+router.use("/notifications", notificationsRoutes);
 
 /* =========================
    USER VERIFICATION

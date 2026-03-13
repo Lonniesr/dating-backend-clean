@@ -27,10 +27,6 @@ function calculateDistance(
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-/**
- * GET /api/discover
- * Returns swipe candidates
- */
 router.get(
   "/",
   requireUser,
@@ -80,7 +76,7 @@ router.get(
        * Users who swiped YOU
        */
       const swipedYou = await prisma.swipe.findMany({
-        where: { targetId: userId },
+        where: { targetId: userId, liked: true },
         select: { swiperId: true },
       });
 
@@ -103,9 +99,6 @@ router.get(
         .flatMap((m) => [m.userAId, m.userBId])
         .filter((id) => id !== userId);
 
-      /**
-       * Prevent large notIn queries
-       */
       const excludedIds = [...swipedIds, ...matchedIds].slice(0, 500);
 
       /**
@@ -149,24 +142,15 @@ router.get(
         },
       };
 
-      /**
-       * Gender filter
-       */
       if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
         whereClause.gender =
           prefs.interestedIn === "Men" ? "male" : "female";
       }
 
-      /**
-       * Race preference
-       */
       if (prefs.racePreference && prefs.racePreference !== "Everyone") {
         whereClause.race = prefs.racePreference;
       }
 
-      /**
-       * Age filter
-       */
       if (minBirthdate || maxBirthdate) {
         whereClause.birthdate = {};
 
@@ -197,7 +181,7 @@ router.get(
           },
         },
 
-        take: 80,
+        take: 120,
       });
 
       /**
@@ -226,35 +210,66 @@ router.get(
         });
       }
 
-      /**
-       * PRIORITIZE USERS WHO LIKED YOU
-       */
       const likedYouSet = new Set(swipedYouIds);
 
-      const ranked = filtered.sort((a, b) => {
+      /**
+       * DISCOVER RANKING ALGORITHM
+       */
+      const ranked = filtered
+        .map((user) => {
+          let score = 0;
 
-        const aLikedYou = likedYouSet.has(a.id);
-        const bLikedYou = likedYouSet.has(b.id);
+          /* Boost if they liked you */
+          if (likedYouSet.has(user.id)) score += 500;
 
-        if (aLikedYou && !bLikedYou) return -1;
-        if (!aLikedYou && bLikedYou) return 1;
+          /* Activity boost */
+          if (user.lastActiveAt) {
+            const hoursSinceActive =
+              (Date.now() - new Date(user.lastActiveAt).getTime()) /
+              (1000 * 60 * 60);
 
-        const aTime = a.lastActiveAt
-          ? new Date(a.lastActiveAt).getTime()
-          : 0;
+            score += Math.max(0, 100 - hoursSinceActive);
+          }
 
-        const bTime = b.lastActiveAt
-          ? new Date(b.lastActiveAt).getTime()
-          : 0;
+          /* Photo count boost */
+          score += (user.photos?.length || 0) * 10;
 
-        return bTime - aTime;
-      });
+          /* Distance boost */
+          if (
+            currentUser.latitude &&
+            currentUser.longitude &&
+            user.latitude &&
+            user.longitude
+          ) {
+            const dist = calculateDistance(
+              currentUser.latitude,
+              currentUser.longitude,
+              user.latitude,
+              user.longitude
+            );
+
+            score += Math.max(0, 50 - dist);
+          }
+
+          /* Randomization */
+          score += Math.random() * 15;
+
+          return { ...user, score };
+        })
+        .sort((a, b) => b.score - a.score);
 
       /**
-       * Convert photo relation → string[]
+       * Convert photos → string[]
        */
       const formatted = ranked.slice(0, 30).map((u) => ({
-        ...u,
+        id: u.id,
+        name: u.name,
+        gender: u.gender,
+        race: u.race,
+        birthdate: u.birthdate,
+        location: u.location,
+        latitude: u.latitude,
+        longitude: u.longitude,
         photos: u.photos?.map((p) => p.url) ?? [],
       }));
 

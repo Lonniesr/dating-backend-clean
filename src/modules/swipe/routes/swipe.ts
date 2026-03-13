@@ -1,163 +1,220 @@
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
+import redis from "../../../redis";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
 /**
+ * ELO adjustment values
+ */
+
+const ELO_LIKE_GAIN = 10;
+const ELO_PASS_LOSS = 2;
+
+/**
  * POST /api/swipe
  */
-router.post("/", requireUser, async (req: Request & { user?: any }, res: Response) => {
-  try {
-    const swiperId = req.user?.id;
 
-    if (!swiperId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+router.post(
+  "/",
+  requireUser,
+  async (req: Request & { user?: any }, res: Response) => {
+    try {
+      const swiperId = req.user?.id;
 
-    const { targetId, liked, superLike } = req.body;
-
-    if (!targetId || typeof targetId !== "string") {
-      return res.status(400).json({ error: "Invalid targetId" });
-    }
-
-    if (targetId === swiperId) {
-      return res.status(400).json({ error: "Cannot swipe yourself" });
-    }
-
-    const isLiked = liked === true;
-    const isSuperLike = superLike === true;
-
-    /* ===============================
-       HANDLE SUPER LIKE LIMIT
-    =============================== */
-
-    if (isSuperLike) {
-      const user = await prisma.user.findUnique({
-        where: { id: swiperId },
-        select: {
-          superLikesRemaining: true,
-          superLikesResetAt: true,
-        },
-      });
-
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
+      if (!swiperId) {
+        return res.status(401).json({ error: "Unauthorized" });
       }
 
-      let remaining = user.superLikesRemaining ?? 0;
-      const now = new Date();
+      const { targetId, liked, superLike } = req.body;
 
-      if (user.superLikesResetAt && now > user.superLikesResetAt) {
-        remaining = 3;
+      if (!targetId || typeof targetId !== "string") {
+        return res.status(400).json({ error: "Invalid targetId" });
+      }
 
-        await prisma.user.update({
+      if (targetId === swiperId) {
+        return res.status(400).json({ error: "Cannot swipe yourself" });
+      }
+
+      const isLiked = liked === true;
+      const isSuperLike = superLike === true;
+
+      /* ===============================
+         HANDLE SUPER LIKE LIMIT
+      =============================== */
+
+      if (isSuperLike) {
+        const user = await prisma.user.findUnique({
           where: { id: swiperId },
-          data: {
-            superLikesRemaining: 3,
-            superLikesResetAt: new Date(now.getTime() + 86400000),
-          },
-        });
-      }
-
-      if (remaining <= 0) {
-        return res.status(403).json({
-          error: "No super likes remaining",
-        });
-      }
-
-      await prisma.user.update({
-        where: { id: swiperId },
-        data: {
-          superLikesRemaining: {
-            decrement: 1,
-          },
-        },
-      });
-    }
-
-    /* ===============================
-       PREVENT DUPLICATE SWIPES
-    =============================== */
-
-    const existingSwipe = await prisma.swipe.findUnique({
-      where: {
-        swiperId_targetId: {
-          swiperId,
-          targetId,
-        },
-      },
-    });
-
-    if (!existingSwipe) {
-      await prisma.swipe.create({
-        data: {
-          swiperId,
-          targetId,
-          liked: isLiked,
-          superLike: isSuperLike,
-        },
-      });
-    }
-
-    /* ===============================
-       CHECK RECIPROCAL LIKE
-    =============================== */
-
-    let isMatch = false;
-
-    if (isLiked) {
-      const reciprocal = await prisma.swipe.findFirst({
-        where: {
-          swiperId: targetId,
-          targetId: swiperId,
-          liked: true,
-        },
-      });
-
-      if (reciprocal) {
-        /**
-         * Always sort IDs so the match is unique
-         * Prevents A-B vs B-A duplicates
-         */
-
-        const [userAId, userBId] =
-          swiperId < targetId
-            ? [swiperId, targetId]
-            : [targetId, swiperId];
-
-        const existingMatch = await prisma.match.findFirst({
-          where: {
-            userAId,
-            userBId,
+          select: {
+            superLikesRemaining: true,
+            superLikesResetAt: true,
           },
         });
 
-        if (!existingMatch) {
-          await prisma.match.create({
+        if (!user) {
+          return res.status(404).json({ error: "User not found" });
+        }
+
+        let remaining = user.superLikesRemaining ?? 0;
+        const now = new Date();
+
+        if (user.superLikesResetAt && now > user.superLikesResetAt) {
+          remaining = 3;
+
+          await prisma.user.update({
+            where: { id: swiperId },
             data: {
-              userAId,
-              userBId,
+              superLikesRemaining: 3,
+              superLikesResetAt: new Date(now.getTime() + 86400000),
             },
           });
         }
 
-        isMatch = true;
+        if (remaining <= 0) {
+          return res.status(403).json({
+            error: "No super likes remaining",
+          });
+        }
+
+        await prisma.user.update({
+          where: { id: swiperId },
+          data: {
+            superLikesRemaining: {
+              decrement: 1,
+            },
+          },
+        });
       }
+
+      /* ===============================
+         PREVENT DUPLICATE SWIPES
+      =============================== */
+
+      const existingSwipe = await prisma.swipe.findUnique({
+        where: {
+          swiperId_targetId: {
+            swiperId,
+            targetId,
+          },
+        },
+      });
+
+      if (!existingSwipe) {
+        await prisma.swipe.create({
+          data: {
+            swiperId,
+            targetId,
+            liked: isLiked,
+            superLike: isSuperLike,
+          },
+        });
+      }
+
+      /* ===============================
+         ELO RANKING UPDATE
+      =============================== */
+
+      if (isLiked) {
+        await prisma.user.update({
+          where: { id: targetId },
+          data: {
+            eloScore: {
+              increment: ELO_LIKE_GAIN,
+            },
+          },
+        });
+      } else {
+        await prisma.user.update({
+          where: { id: targetId },
+          data: {
+            eloScore: {
+              decrement: ELO_PASS_LOSS,
+            },
+          },
+        });
+      }
+
+      /* ===============================
+         CHECK RECIPROCAL LIKE
+      =============================== */
+
+      let isMatch = false;
+
+      if (isLiked) {
+        const reciprocal = await prisma.swipe.findFirst({
+          where: {
+            swiperId: targetId,
+            targetId: swiperId,
+            liked: true,
+          },
+        });
+
+        if (reciprocal) {
+          /**
+           * Always sort IDs so match is unique
+           */
+
+          const [userAId, userBId] =
+            swiperId < targetId
+              ? [swiperId, targetId]
+              : [targetId, swiperId];
+
+          const existingMatch = await prisma.match.findFirst({
+            where: {
+              userAId,
+              userBId,
+            },
+          });
+
+          if (!existingMatch) {
+            await prisma.match.create({
+              data: {
+                userAId,
+                userBId,
+              },
+            });
+
+            /**
+             * NOTIFICATION EVENT
+             */
+
+            await prisma.notification.create({
+              data: {
+                userId: targetId,
+                type: "match",
+                actorId: swiperId,
+              },
+            });
+          }
+
+          isMatch = true;
+        }
+      }
+
+      /* ===============================
+         DISCOVER CACHE INVALIDATION
+      =============================== */
+
+      if (redis) {
+        await redis.del(`discover:${swiperId}`);
+        await redis.del(`discover:${targetId}`);
+      }
+
+      return res.json({
+        success: true,
+        isMatch,
+      });
+
+    } catch (err) {
+      console.error("SWIPE ERROR:", err);
+
+      return res.status(500).json({
+        error: "Swipe failed",
+      });
     }
-
-    return res.json({
-      success: true,
-      isMatch,
-    });
-
-  } catch (err) {
-    console.error("SWIPE ERROR:", err);
-
-    return res.status(500).json({
-      error: "Swipe failed",
-    });
   }
-});
+);
 
 export default router;

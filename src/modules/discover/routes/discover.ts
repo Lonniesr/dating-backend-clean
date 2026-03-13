@@ -7,7 +7,7 @@ const router = Router();
 
 const DISCOVER_CACHE_TTL = 60;
 const PAGE_SIZE = 30;
-const BUFFER_SIZE = 60;
+const BUFFER_SIZE = 120;
 
 function calculateDistance(
   lat1: number,
@@ -48,14 +48,16 @@ router.get(
        * CACHE HIT
        */
 
-      const cached = await redis.get(cacheKey);
+      if (redis) {
+        const cached = await redis.get(cacheKey);
 
-      if (cached) {
-        return res.json(JSON.parse(cached));
+        if (cached) {
+          return res.json(JSON.parse(cached));
+        }
       }
 
       /**
-       * LOAD USER
+       * LOAD CURRENT USER
        */
 
       const currentUser = await prisma.user.findUnique({
@@ -127,10 +129,8 @@ router.get(
             not: userId,
             notIn: excludedIds,
           },
-
           onboardingComplete: true,
           banned: false,
-
           photos: {
             some: {},
           },
@@ -146,6 +146,7 @@ router.get(
           latitude: true,
           longitude: true,
           lastActiveAt: true,
+          eloScore: true,
 
           photos: {
             select: { url: true },
@@ -153,7 +154,7 @@ router.get(
           },
         },
 
-        take: 200,
+        take: 300,
       });
 
       /**
@@ -164,7 +165,41 @@ router.get(
         .map((user) => {
           let score = 0;
 
+          /* PRIORITIZE USERS WHO LIKED YOU */
           if (likedYouSet.has(user.id)) score += 500;
+
+          /* COMPATIBILITY SCORING */
+
+          // Gender compatibility
+          if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
+            if (
+              (prefs.interestedIn === "Men" && user.gender === "male") ||
+              (prefs.interestedIn === "Women" && user.gender === "female")
+            ) {
+              score += 50;
+            } else {
+              score -= 40;
+            }
+          }
+
+          // Age compatibility
+          if (user.birthdate) {
+            const age =
+              new Date().getFullYear() -
+              new Date(user.birthdate).getFullYear();
+
+            if (prefs.minAge && age < prefs.minAge) score -= 50;
+            if (prefs.maxAge && age > prefs.maxAge) score -= 50;
+
+            if (
+              (!prefs.minAge || age >= prefs.minAge) &&
+              (!prefs.maxAge || age <= prefs.maxAge)
+            ) {
+              score += 40;
+            }
+          }
+
+          /* ACTIVITY BOOST */
 
           if (user.lastActiveAt) {
             const hours =
@@ -174,7 +209,15 @@ router.get(
             score += Math.max(0, 100 - hours);
           }
 
+          /* PHOTO COUNT BOOST */
+
           score += (user.photos?.length || 0) * 10;
+
+          /* ELO ATTRACTIVENESS */
+
+          score += user.eloScore * 0.05;
+
+          /* DISTANCE SCORING */
 
           if (
             currentUser.latitude &&
@@ -191,6 +234,8 @@ router.get(
 
             score += Math.max(0, 50 - dist);
           }
+
+          /* RANDOMIZATION (prevents stale stacks) */
 
           score += Math.random() * 10;
 
@@ -225,11 +270,14 @@ router.get(
        * SAVE CACHE
        */
 
-      await redis.set(cacheKey, JSON.stringify(response), {
-        EX: DISCOVER_CACHE_TTL,
-      });
+      if (redis) {
+        await redis.set(cacheKey, JSON.stringify(response), {
+          EX: DISCOVER_CACHE_TTL,
+        });
+      }
 
       return res.json(response);
+
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
 

@@ -22,7 +22,7 @@ import matchCountRoutes from "../modules/user/routes/matchCount";
 import statsRoutes from "../modules/user/routes/stats";
 import photosRouter from "../modules/user/routes/photos";
 
-/* 🔔 NEW NOTIFICATION ROUTE */
+/* 🔔 NOTIFICATIONS */
 import notificationsRoutes from "../modules/user/routes/notifications";
 
 /* =========================
@@ -69,15 +69,15 @@ router.use("/auth", authRoutes);
 
 router.use("/onboarding", onboardingRoutes);
 
-// Core user routes
 router.use("/user", userRoutes);
 router.use("/profile", profileRoutes);
+
 router.use("/user/photos", photosRouter);
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);
 
-/* 🔔 NOTIFICATIONS (navbar badges) */
+/* 🔔 NAVBAR NOTIFICATION BADGES */
 router.use("/notifications", notificationsRoutes);
 
 /* =========================
@@ -93,8 +93,8 @@ router.use("/user/selfie-verification", selfieVerificationRoutes);
 
 /**
  * IMPORTANT:
- * Specific invite routes must come BEFORE the dynamic /:code route
- * otherwise Express will treat "stats" and "leaderboard" as invite codes.
+ * Specific invite routes must come BEFORE
+ * the dynamic /:code route
  */
 
 router.use("/invite", inviteRoutes);

@@ -14,6 +14,7 @@ router.get(
   async (req: Request & { user?: any }, res: Response) => {
     try {
       const userId = req.user?.id;
+
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -29,10 +30,12 @@ router.get(
               id: true,
               name: true,
               gender: true,
-              race: true,
-              photos: true,
-              birthdate: true,
               location: true,
+              birthdate: true,
+              photos: {
+                select: { url: true },
+                orderBy: { order: "asc" },
+              },
             },
           },
           userB: {
@@ -40,31 +43,36 @@ router.get(
               id: true,
               name: true,
               gender: true,
-              race: true,
-              photos: true,
-              birthdate: true,
               location: true,
+              birthdate: true,
+              photos: {
+                select: { url: true },
+                orderBy: { order: "asc" },
+              },
             },
           },
         },
       });
 
-      // Normalize so frontend always gets "otherUser"
-      const normalizedMatches = matches.map((match) => {
+      const normalized = matches.map((match) => {
         const otherUser =
           match.userAId === userId ? match.userB : match.userA;
 
         return {
-          id: match.id,
-          createdAt: match.createdAt,
-          user: otherUser,
+          id: otherUser.id,
+          name: otherUser.name,
+          gender: otherUser.gender,
+          location: otherUser.location,
+          birthdate: otherUser.birthdate,
+          photos: otherUser.photos.map((p) => p.url),
         };
       });
 
-      return res.json(normalizedMatches);
+      res.json(normalized);
+
     } catch (err) {
       console.error("MATCH LIST ERROR:", err);
-      return res.status(500).json({ error: "Failed to load matches" });
+      res.status(500).json({ error: "Failed to load matches" });
     }
   }
 );

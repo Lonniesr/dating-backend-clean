@@ -1,55 +1,64 @@
-import { Router, Request, Response } from "express";
-import { requireUser } from "../../../middleware/requireUser";
+import { Router } from "express";
 import prisma from "../../../prisma";
+import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
 /**
  * GET /api/conversations
- * Returns all conversations for the logged-in user
+ * Conversation preview list
  */
-router.get("/", requireUser, async (req: any, res: Response) => {
+router.get("/", requireUser, async (req: any, res) => {
   try {
     const userId = req.user.id;
 
     const conversations = await prisma.conversation.findMany({
       where: {
-        OR: [{ userAId: userId }, { userBId: userId }],
+        OR: [
+          { userAId: userId },
+          { userBId: userId }
+        ]
+      },
+      orderBy: {
+        updatedAt: "desc"
       },
       include: {
         userA: {
-          include: {
+          select: {
+            id: true,
+            name: true,
             photos: {
-              orderBy: { order: "asc" },
-              take: 1,
-            },
-          },
+              select: { url: true },
+              take: 1
+            }
+          }
         },
         userB: {
-          include: {
+          select: {
+            id: true,
+            name: true,
             photos: {
-              orderBy: { order: "asc" },
-              take: 1,
-            },
-          },
+              select: { url: true },
+              take: 1
+            }
+          }
         },
-        lastMessage: true,
-      },
-      orderBy: {
-        updatedAt: "desc",
-      },
+        lastMessage: true
+      }
     });
 
     const formatted = await Promise.all(
       conversations.map(async (c) => {
-        const other = c.userAId === userId ? c.userB : c.userA;
 
-        const unreadCount = await prisma.message.count({
+        const other =
+          c.userAId === userId ? c.userB : c.userA;
+
+        const unread = await prisma.message.count({
           where: {
             conversationId: c.id,
             receiverId: userId,
-            read: false,
-          },
+            read: false
+          }
         });
 
         return {
@@ -57,29 +66,24 @@ router.get("/", requireUser, async (req: any, res: Response) => {
           user: {
             id: other.id,
             name: other.name,
-            avatar: other.photos?.[0]?.url ?? null,
-            online: false,
+            avatar: other.photos[0]?.url || null
           },
           lastMessage: c.lastMessage
             ? {
-                id: c.lastMessage.id,
                 text: c.lastMessage.text,
-                createdAt: c.lastMessage.createdAt,
-                read: c.lastMessage.read,
-                senderId: c.lastMessage.senderId,
+                createdAt: c.lastMessage.createdAt
               }
             : null,
-          unreadCount,
+          unreadCount: unread
         };
       })
     );
 
     res.json(formatted);
+
   } catch (err) {
     console.error("CONVERSATIONS ERROR:", err);
-    res.status(500).json({
-      message: "Failed to load conversations.",
-    });
+    res.status(500).json({ message: "Failed to load conversations" });
   }
 });
 

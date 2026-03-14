@@ -6,30 +6,32 @@ const router = Router();
 
 /*
 GET /api/conversations/:matchId
-Finds or creates a conversation between the logged-in user and the match
+Find or create conversation between users
 */
 
 router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-    const matchId = req.params.matchId as string; // 👈 FIX
+    const matchId = req.params.matchId as string;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    /* Look for existing conversation */
-
     let conversation = await prisma.conversation.findFirst({
       where: {
         OR: [
-          { userAId: userId, userBId: matchId },
-          { userAId: matchId, userBId: userId }
+          {
+            userAId: userId,
+            userBId: matchId
+          },
+          {
+            userAId: matchId,
+            userBId: userId
+          }
         ]
       }
     });
-
-    /* If none exists, create it */
 
     if (!conversation) {
       conversation = await prisma.conversation.create({
@@ -43,7 +45,7 @@ router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
     res.json(conversation);
 
   } catch (err) {
-    console.error("GET CONVERSATION ERROR:", err);
+    console.error("CONVERSATION ERROR:", err);
     res.status(500).json({ error: "Failed to load conversation" });
   }
 });

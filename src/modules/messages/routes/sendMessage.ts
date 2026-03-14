@@ -18,9 +18,14 @@ export default async function sendMessage(
       return res.status(400).json({ error: "Message text required" });
     }
 
+    /* =========================
+       LOAD CONVERSATION
+    ========================= */
+
     const conversation = await prisma.conversation.findUnique({
       where: { id: conversationId },
       select: {
+        id: true,
         userAId: true,
         userBId: true,
       },
@@ -30,10 +35,29 @@ export default async function sendMessage(
       return res.status(404).json({ error: "Conversation not found" });
     }
 
+    /* =========================
+       SECURITY CHECK
+    ========================= */
+
+    if (
+      conversation.userAId !== userId &&
+      conversation.userBId !== userId
+    ) {
+      return res.status(403).json({ error: "Not part of this conversation" });
+    }
+
+    /* =========================
+       DETERMINE RECEIVER
+    ========================= */
+
     const receiverId =
       conversation.userAId === userId
         ? conversation.userBId
         : conversation.userAId;
+
+    /* =========================
+       CREATE MESSAGE
+    ========================= */
 
     const message = await prisma.message.create({
       data: {
@@ -44,7 +68,21 @@ export default async function sendMessage(
       },
     });
 
+    /* =========================
+       UPDATE CONVERSATION
+       (moves chat to top)
+    ========================= */
+
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        updatedAt: new Date(),
+        lastMessageId: message.id,
+      },
+    });
+
     return res.json(message);
+
   } catch (err) {
     console.error("SEND MESSAGE ERROR:", err);
     return res.status(500).json({ error: "Failed to send message" });

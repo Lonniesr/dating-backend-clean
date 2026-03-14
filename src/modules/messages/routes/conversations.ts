@@ -90,21 +90,22 @@ router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const userAId = [userId, matchId].sort()[0];
-    const userBId = [userId, matchId].sort()[1];
+    // Normalize user order so duplicates can't happen
+    const [userAId, userBId] = [userId, matchId].sort();
 
-    let conversation = await prisma.conversation.findFirst({
-      where: { userAId, userBId }
-    });
-
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
+    const conversation = await prisma.conversation.upsert({
+      where: {
+        userAId_userBId: {
           userAId,
           userBId
         }
-      });
-    }
+      },
+      update: {},
+      create: {
+        userAId,
+        userBId
+      }
+    });
 
     res.json(conversation);
 

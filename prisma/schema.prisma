@@ -137,6 +137,7 @@ model Conversation {
 
   @@index([userAId])
   @@index([userBId])
+  @@index([updatedAt])
 
   // prevents duplicate conversations between the same two users
   @@unique([userAId, userBId])

@@ -1,89 +1,50 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
-/**
- * GET /api/conversations
- * Conversation preview list
- */
-router.get("/", requireUser, async (req: any, res) => {
-  try {
-    const userId = req.user.id;
+/*
+GET /api/conversations/:matchId
+Finds or creates a conversation between the logged-in user and the match
+*/
 
-    const conversations = await prisma.conversation.findMany({
+router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const matchId = req.params.matchId as string; // 👈 FIX
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    /* Look for existing conversation */
+
+    let conversation = await prisma.conversation.findFirst({
       where: {
         OR: [
-          { userAId: userId },
-          { userBId: userId }
+          { userAId: userId, userBId: matchId },
+          { userAId: matchId, userBId: userId }
         ]
-      },
-      orderBy: {
-        updatedAt: "desc"
-      },
-      include: {
-        userA: {
-          select: {
-            id: true,
-            name: true,
-            photos: {
-              select: { url: true },
-              take: 1
-            }
-          }
-        },
-        userB: {
-          select: {
-            id: true,
-            name: true,
-            photos: {
-              select: { url: true },
-              take: 1
-            }
-          }
-        },
-        lastMessage: true
       }
     });
 
-    const formatted = await Promise.all(
-      conversations.map(async (c) => {
+    /* If none exists, create it */
 
-        const other =
-          c.userAId === userId ? c.userB : c.userA;
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: {
+          userAId: userId,
+          userBId: matchId
+        }
+      });
+    }
 
-        const unread = await prisma.message.count({
-          where: {
-            conversationId: c.id,
-            receiverId: userId,
-            read: false
-          }
-        });
-
-        return {
-          conversationId: c.id,
-          user: {
-            id: other.id,
-            name: other.name,
-            avatar: other.photos[0]?.url || null
-          },
-          lastMessage: c.lastMessage
-            ? {
-                text: c.lastMessage.text,
-                createdAt: c.lastMessage.createdAt
-              }
-            : null,
-          unreadCount: unread
-        };
-      })
-    );
-
-    res.json(formatted);
+    res.json(conversation);
 
   } catch (err) {
-    console.error("CONVERSATIONS ERROR:", err);
-    res.status(500).json({ message: "Failed to load conversations" });
+    console.error("GET CONVERSATION ERROR:", err);
+    res.status(500).json({ error: "Failed to load conversation" });
   }
 });
 

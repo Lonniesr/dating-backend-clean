@@ -6,7 +6,6 @@ const router = Router();
 
 /* ============================
    GET USER CONVERSATIONS
-   Used by MessagesPage
 ============================ */
 
 router.get("/", requireUser, async (req: Request, res: Response) => {
@@ -51,23 +50,21 @@ router.get("/", requireUser, async (req: Request, res: Response) => {
 
     const formatted = conversations.map((c) => {
       const otherUser = c.userAId === userId ? c.userB : c.userA;
+      const lastMessage = c.messages[0] || null;
 
       return {
         conversationId: c.id,
-
         user: {
           id: otherUser.id,
           name: otherUser.name,
           avatar: otherUser.photos?.[0]?.url ?? null
         },
-
-        lastMessage: c.messages[0]
+        lastMessage: lastMessage
           ? {
-              text: c.messages[0].text,
-              createdAt: c.messages[0].createdAt
+              text: lastMessage.text,
+              createdAt: lastMessage.createdAt
             }
           : null,
-
         unreadCount: 0
       };
     });
@@ -87,7 +84,7 @@ router.get("/", requireUser, async (req: Request, res: Response) => {
 router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-    const matchId = req.params.matchId as string;
+    const matchId = req.params.matchId;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -102,7 +99,10 @@ router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
 
     if (!conversation) {
       conversation = await prisma.conversation.create({
-        data: { userAId, userBId }
+        data: {
+          userAId,
+          userBId
+        }
       });
     }
 

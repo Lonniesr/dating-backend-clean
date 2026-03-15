@@ -1,16 +1,55 @@
 import { Request, Response } from "express";
 import prisma from "../../../prisma";
 
+async function resolveConversation(userId: string, id: string) {
+
+  // 1️⃣ try conversationId first
+  let conversation = await prisma.conversation.findUnique({
+    where: { id },
+  });
+
+  if (conversation) {
+    return conversation;
+  }
+
+  // 2️⃣ otherwise treat as otherUserId
+  conversation = await prisma.conversation.findFirst({
+    where: {
+      OR: [
+        { userAId: userId, userBId: id },
+        { userAId: id, userBId: userId },
+      ],
+    },
+  });
+
+  // 3️⃣ create conversation if none exists
+  if (!conversation) {
+
+    // normalize order so duplicates never happen
+    const [userAId, userBId] = [userId, id].sort();
+
+    conversation = await prisma.conversation.create({
+      data: {
+        userAId,
+        userBId,
+      },
+    });
+  }
+
+  return conversation;
+}
+
 export default async function sendMessage(
-  req: Request<{ conversationId: string }>,
+  req: Request<{ id: string }>,
   res: Response
 ) {
   try {
-    const userId = (req as any).user?.id;
-    const { conversationId } = req.params;
+
+    const senderId = (req as any).user?.id;
+    const id = req.params.id;
     const { text } = req.body;
 
-    if (!userId) {
+    if (!senderId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -19,39 +58,17 @@ export default async function sendMessage(
     }
 
     /* =========================
-       LOAD CONVERSATION
+       RESOLVE CONVERSATION
     ========================= */
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      select: {
-        id: true,
-        userAId: true,
-        userBId: true,
-      },
-    });
-
-    if (!conversation) {
-      return res.status(404).json({ error: "Conversation not found" });
-    }
-
-    /* =========================
-       SECURITY CHECK
-    ========================= */
-
-    if (
-      conversation.userAId !== userId &&
-      conversation.userBId !== userId
-    ) {
-      return res.status(403).json({ error: "Not part of this conversation" });
-    }
+    const conversation = await resolveConversation(senderId, id);
 
     /* =========================
        DETERMINE RECEIVER
     ========================= */
 
     const receiverId =
-      conversation.userAId === userId
+      conversation.userAId === senderId
         ? conversation.userBId
         : conversation.userAId;
 
@@ -61,8 +78,8 @@ export default async function sendMessage(
 
     const message = await prisma.message.create({
       data: {
-        conversationId,
-        senderId: userId,
+        conversationId: conversation.id,
+        senderId,
         receiverId,
         text: text.trim(),
       },
@@ -70,11 +87,10 @@ export default async function sendMessage(
 
     /* =========================
        UPDATE CONVERSATION
-       (moves chat to top)
     ========================= */
 
     await prisma.conversation.update({
-      where: { id: conversationId },
+      where: { id: conversation.id },
       data: {
         updatedAt: new Date(),
         lastMessageId: message.id,
@@ -84,7 +100,12 @@ export default async function sendMessage(
     return res.json(message);
 
   } catch (err) {
+
     console.error("SEND MESSAGE ERROR:", err);
-    return res.status(500).json({ error: "Failed to send message" });
+
+    return res.status(500).json({
+      error: "Failed to send message",
+    });
+
   }
 }

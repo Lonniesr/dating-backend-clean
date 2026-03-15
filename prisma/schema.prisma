@@ -18,7 +18,7 @@ model User {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  username           String?
+  username           String?  @unique
   name               String?
   birthdate          DateTime?
   age                Int?

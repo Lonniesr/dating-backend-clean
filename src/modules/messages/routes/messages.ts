@@ -5,46 +5,52 @@ import { requireUser } from "../../../middleware/requireUser";
 const router = Router();
 
 /**
+ * Resolve conversation from either:
+ *  - conversationId
+ *  - receiverId
+ */
+async function resolveConversation(userId: string, id: string) {
+  // First try conversationId
+  let conversation = await prisma.conversation.findUnique({
+    where: { id },
+  });
+
+  if (conversation) {
+    return conversation;
+  }
+
+  // Otherwise treat as receiverId
+  conversation = await prisma.conversation.findFirst({
+    where: {
+      OR: [
+        { userAId: userId, userBId: id },
+        { userAId: id, userBId: userId },
+      ],
+    },
+  });
+
+  if (!conversation) {
+    conversation = await prisma.conversation.create({
+      data: {
+        userAId: userId,
+        userBId: id,
+      },
+    });
+  }
+
+  return conversation;
+}
+
+/**
  * GET /api/messages/:id
- * Returns chat history with a specific user
+ * Load chat history
  */
 router.get("/:id", requireUser, async (req: any, res) => {
   try {
     const userId = req.user.id;
-    const otherId = req.params.id;
+    const id = req.params.id;
 
-    const match = await prisma.match.findFirst({
-      where: {
-        OR: [
-          { userAId: userId, userBId: otherId },
-          { userAId: otherId, userBId: userId },
-        ],
-      },
-    });
-
-    if (!match) {
-      return res
-        .status(403)
-        .json({ message: "You can only message users you matched with." });
-    }
-
-    let conversation = await prisma.conversation.findFirst({
-      where: {
-        OR: [
-          { userAId: userId, userBId: otherId },
-          { userAId: otherId, userBId: userId },
-        ],
-      },
-    });
-
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
-          userAId: userId,
-          userBId: otherId,
-        },
-      });
-    }
+    const conversation = await resolveConversation(userId, id);
 
     const messages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
@@ -70,12 +76,12 @@ router.get("/:id", requireUser, async (req: any, res) => {
 
 /**
  * POST /api/messages/:id
- * Send a message
+ * Send message
  */
 router.post("/:id", requireUser, async (req: any, res) => {
   try {
     const senderId = req.user.id;
-    const receiverId = req.params.id;
+    const id = req.params.id;
 
     const { text, imageUrl, audioUrl, replyToId } = req.body;
 
@@ -88,11 +94,9 @@ router.post("/:id", requireUser, async (req: any, res) => {
       return res.status(401).json({ message: "Unauthorized." });
     }
 
-    // 🔒 block media for unverified users
     if (!sender.verified && (imageUrl || audioUrl)) {
       return res.status(403).json({
-        message:
-          "Verify your profile to send photos and voice messages.",
+        message: "Verify your profile to send photos and voice messages.",
       });
     }
 
@@ -102,38 +106,12 @@ router.post("/:id", requireUser, async (req: any, res) => {
       });
     }
 
-    const match = await prisma.match.findFirst({
-      where: {
-        OR: [
-          { userAId: senderId, userBId: receiverId },
-          { userAId: receiverId, userBId: senderId },
-        ],
-      },
-    });
+    const conversation = await resolveConversation(senderId, id);
 
-    if (!match) {
-      return res
-        .status(403)
-        .json({ message: "You can only message users you matched with." });
-    }
-
-    let conversation = await prisma.conversation.findFirst({
-      where: {
-        OR: [
-          { userAId: senderId, userBId: receiverId },
-          { userAId: receiverId, userBId: senderId },
-        ],
-      },
-    });
-
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
-        data: {
-          userAId: senderId,
-          userBId: receiverId,
-        },
-      });
-    }
+    const receiverId =
+      conversation.userAId === senderId
+        ? conversation.userBId
+        : conversation.userAId;
 
     const message = await prisma.message.create({
       data: {

@@ -3,16 +3,14 @@ import prisma from "../../../prisma";
 
 async function resolveConversation(userId: string, id: string) {
 
-  // 1️⃣ try conversationId first
+  // try conversationId first
   let conversation = await prisma.conversation.findUnique({
     where: { id },
   });
 
-  if (conversation) {
-    return conversation;
-  }
+  if (conversation) return conversation;
 
-  // 2️⃣ otherwise treat as otherUserId
+  // otherwise treat as otherUserId
   conversation = await prisma.conversation.findFirst({
     where: {
       OR: [
@@ -22,10 +20,7 @@ async function resolveConversation(userId: string, id: string) {
     },
   });
 
-  // 3️⃣ create conversation if none exists
   if (!conversation) {
-
-    // normalize order so duplicates never happen
     const [userAId, userBId] = [userId, id].sort();
 
     conversation = await prisma.conversation.create({
@@ -40,13 +35,13 @@ async function resolveConversation(userId: string, id: string) {
 }
 
 export default async function sendMessage(
-  req: Request<{ id: string }>,
+  req: Request<{ conversationId: string }>,
   res: Response
 ) {
   try {
 
     const senderId = (req as any).user?.id;
-    const id = req.params.id;
+    const id = req.params.conversationId;
     const { text } = req.body;
 
     if (!senderId) {
@@ -57,24 +52,12 @@ export default async function sendMessage(
       return res.status(400).json({ error: "Message text required" });
     }
 
-    /* =========================
-       RESOLVE CONVERSATION
-    ========================= */
-
     const conversation = await resolveConversation(senderId, id);
-
-    /* =========================
-       DETERMINE RECEIVER
-    ========================= */
 
     const receiverId =
       conversation.userAId === senderId
         ? conversation.userBId
         : conversation.userAId;
-
-    /* =========================
-       CREATE MESSAGE
-    ========================= */
 
     const message = await prisma.message.create({
       data: {
@@ -84,10 +67,6 @@ export default async function sendMessage(
         text: text.trim(),
       },
     });
-
-    /* =========================
-       UPDATE CONVERSATION
-    ========================= */
 
     await prisma.conversation.update({
       where: { id: conversation.id },

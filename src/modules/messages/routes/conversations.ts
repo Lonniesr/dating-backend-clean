@@ -48,26 +48,37 @@ router.get("/", requireUser, async (req: Request, res: Response) => {
       }
     });
 
-    const formatted = conversations.map((c) => {
-      const otherUser = c.userAId === userId ? c.userB : c.userA;
-      const lastMessage = c.messages[0] || null;
+    const formatted = await Promise.all(
+      conversations.map(async (c) => {
 
-      return {
-        conversationId: c.id,
-        user: {
-          id: otherUser.id,
-          name: otherUser.name,
-          avatar: otherUser.photos?.[0]?.url ?? null
-        },
-        lastMessage: lastMessage
-          ? {
-              text: lastMessage.text,
-              createdAt: lastMessage.createdAt
-            }
-          : null,
-        unreadCount: 0
-      };
-    });
+        const otherUser = c.userAId === userId ? c.userB : c.userA;
+        const lastMessage = c.messages[0] || null;
+
+        const unreadCount = await prisma.message.count({
+          where: {
+            conversationId: c.id,
+            receiverId: userId,
+            read: false
+          }
+        });
+
+        return {
+          conversationId: c.id,
+          user: {
+            id: otherUser.id,
+            name: otherUser.name,
+            avatar: otherUser.photos?.[0]?.url ?? null
+          },
+          lastMessage: lastMessage
+            ? {
+                text: lastMessage.text,
+                createdAt: lastMessage.createdAt
+              }
+            : null,
+          unreadCount
+        };
+      })
+    );
 
     res.json(formatted);
 
@@ -90,7 +101,6 @@ router.get("/:matchId", requireUser, async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Normalize user order so duplicates can't happen
     const [userAId, userBId] = [userId, matchId].sort();
 
     const conversation = await prisma.conversation.upsert({

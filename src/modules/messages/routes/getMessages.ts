@@ -13,6 +13,21 @@ export default async function getMessages(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    /* =========================
+       MARK MESSAGES AS READ
+    ========================= */
+
+    await prisma.message.updateMany({
+      where: {
+        conversationId,
+        receiverId: userId,
+        read: false
+      },
+      data: {
+        read: true
+      }
+    });
+
     const messages = await prisma.message.findMany({
       where: {
         conversationId: conversationId,
@@ -33,6 +48,7 @@ export default async function getMessages(
     });
 
     return res.json(messages);
+
   } catch (err) {
     console.error("GET MESSAGES ERROR:", err);
     return res.status(500).json({ error: "Failed to load messages" });

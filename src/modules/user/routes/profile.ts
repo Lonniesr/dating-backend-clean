@@ -101,6 +101,7 @@ router.get(
           username: true,
           name: true,
           birthdate: true,
+          age: true,
           gender: true,
           race: true,
           bio: true,
@@ -108,6 +109,7 @@ router.get(
           latitude: true,
           longitude: true,
           verified: true,
+          prompts: true,
         },
       });
 

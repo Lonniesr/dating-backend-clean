@@ -14,6 +14,7 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
 
     const {
       name,
+      username,
       birthdate,
       gender,
       race,
@@ -24,10 +25,16 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
     } = req.body;
 
     /* =========================
+       NORMALIZE NAME
+    ========================= */
+
+    const finalName = (name || username || "").trim();
+
+    /* =========================
        VALIDATION
     ========================= */
 
-    if (!name || !birthdate || !gender || !race) {
+    if (!finalName || !birthdate || !gender || !race) {
       return res.status(400).json({
         error: "Name, birthdate, gender, and race are required.",
       });
@@ -76,7 +83,7 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        name: name.trim(),
+        name: finalName,
         birthdate: parsedBirthdate,
         age,
         gender,

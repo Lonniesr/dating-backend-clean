@@ -4,16 +4,21 @@ import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
+type AuthRequest = Request & {
+  user?: {
+    id: string;
+  };
+};
+
 /**
  * GET /api/profile
+ * Get logged-in user's profile
  */
 router.get(
   "/",
   requireUser,
-  async (req: Request & { user?: any }, res: Response) => {
-
+  async (req: AuthRequest, res: Response) => {
     try {
-
       const userId = req.user?.id;
 
       if (!userId) {
@@ -68,9 +73,7 @@ router.get(
       };
 
       return res.json(profile);
-
     } catch (err) {
-
       console.error("PROFILE FETCH ERROR:", err);
 
       return res.status(500).json({
@@ -81,15 +84,66 @@ router.get(
 );
 
 /**
+ * GET /api/profile/:id
+ * View another user's public profile
+ */
+router.get(
+  "/:id",
+  requireUser,
+  async (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          birthdate: true,
+          gender: true,
+          race: true,
+          bio: true,
+          location: true,
+          latitude: true,
+          longitude: true,
+          verified: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const photos = await prisma.photo.findMany({
+        where: { userId: id },
+        orderBy: { order: "asc" },
+        select: { url: true },
+      });
+
+      return res.json({
+        ...user,
+        photos: photos.map((p) => p.url),
+      });
+    } catch (err) {
+      console.error("PROFILE VIEW ERROR:", err);
+
+      return res.status(500).json({
+        error: "Server error",
+      });
+    }
+  }
+);
+
+/**
  * POST /api/profile/location
+ * Save user's latitude & longitude
  */
 router.post(
   "/location",
   requireUser,
-  async (req: Request & { user?: any }, res: Response) => {
-
+  async (req: AuthRequest, res: Response) => {
     try {
-
       const userId = req.user?.id;
 
       if (!userId) {
@@ -123,9 +177,7 @@ router.post(
         success: true,
         location: updatedUser,
       });
-
     } catch (err) {
-
       console.error("LOCATION SAVE ERROR:", err);
 
       return res.status(500).json({

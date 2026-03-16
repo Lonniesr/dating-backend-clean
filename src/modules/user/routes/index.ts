@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { requireUser } from "../../../middleware/requireUser";
 import prisma from "../../../prisma";
 
@@ -13,6 +13,36 @@ import profileCompletion from "./profileCompletion";
 import getMatches from "./getMatches";
 
 const router = Router();
+
+/**
+ * USERNAME CHECK
+ * Public route for onboarding
+ */
+router.get("/check-username", async (req: Request, res: Response) => {
+  try {
+    const username = String(req.query.username || "").toLowerCase();
+
+    if (!username || username.length < 3) {
+      return res.json({ available: false });
+    }
+
+    const existing = await prisma.user.findFirst({
+      where: { username },
+      select: { id: true },
+    });
+
+    res.json({
+      available: !existing,
+    });
+
+  } catch (err) {
+    console.error("USERNAME CHECK ERROR:", err);
+
+    res.status(500).json({
+      available: false,
+    });
+  }
+});
 
 /**
  * PROFILE

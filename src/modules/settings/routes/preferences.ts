@@ -18,13 +18,9 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
 
     const userId = req.user.id;
 
-    const { preferences } = req.body;
+    /* Accept both payload formats */
 
-    if (!preferences) {
-      return res.status(400).json({
-        error: "Missing preferences",
-      });
-    }
+    const payload = req.body.preferences || req.body;
 
     const {
       interestedIn,
@@ -32,7 +28,7 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
       minAge,
       maxAge,
       locationRadius,
-    } = preferences;
+    } = payload;
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },

@@ -5,72 +5,46 @@ import { requireUser } from "../../../middleware/requireUser";
 const router = Router();
 
 /**
- * PUT /api/settings/preferences
- * Update dating preferences
+ * POST /api/onboarding/preferences
+ * Save dating preferences during onboarding
  */
-router.put("/", requireUser, async (req: Request, res: Response) => {
+
+router.post("/", requireUser, async (req: Request, res: Response) => {
   try {
+
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const userId = req.user.id;
 
-    const {
-      interestedIn,
-      minAge,
-      maxAge,
-      racePreference,
-      locationRadius,
-    } = req.body;
+    const { preferences } = req.body;
 
-    /* ===============================
-       LOAD CURRENT PREFERENCES
-    =============================== */
-
-    const currentUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { preferences: true },
-    });
-
-    if (!currentUser) {
-      return res.status(404).json({ error: "User not found" });
+    if (!preferences) {
+      return res.status(400).json({
+        error: "Missing preferences",
+      });
     }
 
-    const existingPreferences =
-      currentUser.preferences &&
-      typeof currentUser.preferences === "object"
-        ? (currentUser.preferences as Record<string, any>)
-        : {};
-
-    /* ===============================
-       BUILD UPDATED OBJECT
-    =============================== */
-
-    const updatedPreferences = {
-      ...existingPreferences,
-
-      ...(interestedIn !== undefined && { interestedIn }),
-
-      ...(minAge !== undefined && { minAge: Number(minAge) }),
-
-      ...(maxAge !== undefined && { maxAge: Number(maxAge) }),
-
-      ...(racePreference !== undefined && { racePreference }),
-
-      ...(locationRadius !== undefined && {
-        locationRadius: Number(locationRadius),
-      }),
-    };
-
-    /* ===============================
-       UPDATE USER
-    =============================== */
+    const {
+      interestedIn,
+      racePreference,
+      minAge,
+      maxAge,
+      locationRadius,
+    } = preferences;
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        preferences: updatedPreferences,
+        preferences: {
+          interestedIn,
+          racePreference,
+          minAge: Number(minAge),
+          maxAge: Number(maxAge),
+          locationRadius:
+            locationRadius === null ? null : Number(locationRadius),
+        },
       },
       select: {
         id: true,
@@ -84,11 +58,13 @@ router.put("/", requireUser, async (req: Request, res: Response) => {
     });
 
   } catch (err) {
-    console.error("PREFERENCES UPDATE ERROR:", err);
+
+    console.error("ONBOARDING PREFERENCES ERROR:", err);
 
     return res.status(500).json({
       error: "Server error",
     });
+
   }
 });
 

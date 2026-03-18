@@ -53,7 +53,6 @@ model User {
   superLikesRemaining Int     @default(3)
   superLikesResetAt   DateTime?
 
-  /* 🔥 ELO ATTRACTIVENESS RANKING */
   eloScore           Int      @default(1000)
 
   Admin              Admin?
@@ -75,10 +74,26 @@ model User {
 
   photos             Photo[]
 
-  /* 🔔 NOTIFICATIONS */
   notifications      Notification[]
 
+  /* ✅ FEEDBACK RELATION */
+  feedbacks          Feedback[]
+
   @@index([latitude, longitude])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+
+  userId    String
+  message   String
+  page      String?
+
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Photo {
@@ -139,7 +154,6 @@ model Conversation {
   @@index([userBId])
   @@index([updatedAt])
 
-  // prevents duplicate conversations between the same two users
   @@unique([userAId, userBId])
 }
 
@@ -254,8 +268,6 @@ model Swipe {
   @@index([swiperId])
   @@index([targetId])
 }
-
-/* 🔔 NOTIFICATION SYSTEM */
 
 model Notification {
   id        String   @id @default(uuid())

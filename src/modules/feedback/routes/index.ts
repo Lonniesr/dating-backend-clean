@@ -4,12 +4,23 @@ import prisma from "../../../prisma";
 
 const router = Router();
 
+type AuthRequest = Request & {
+  user?: {
+    id: string;
+  };
+};
+
 /**
  * POST /api/feedback
  */
-router.post("/", requireUser, async (req: Request, res: Response) => {
+router.post("/", requireUser, async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    // ✅ Ensure user is defined (fixes TS + runtime safety)
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const userId = req.user.id;
 
     const { message, page } = req.body;
 

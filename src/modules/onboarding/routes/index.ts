@@ -2,7 +2,6 @@ import { Router } from "express";
 
 import basicRoutes from "./basic";
 import photosRoutes from "./photos";
-import preferencesRoutes from "./preferences";
 import personalityRoutes from "./personality";
 import completeRoutes from "./complete";
 
@@ -23,7 +22,6 @@ const router = Router();
 
 router.use("/basic", basicRoutes);
 router.use("/photos", photosRoutes);
-router.use("/preferences", preferencesRoutes);
 router.use("/personality", personalityRoutes);
 router.use("/complete", completeRoutes);
 

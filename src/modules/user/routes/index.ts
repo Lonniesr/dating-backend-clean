@@ -4,7 +4,6 @@ import prisma from "../../../prisma";
 
 // Controllers
 import updateProfile from "./updateProfile";
-import editProfile from "./editProfile";
 import deletePhoto from "./deletePhoto";
 import reorderPhotos from "./reorderPhotos";
 import swipeStats from "../../swipe/routes/swipeStats";
@@ -16,7 +15,6 @@ const router = Router();
 
 /**
  * USERNAME CHECK
- * Public route for onboarding
  */
 router.get("/check-username", async (req: Request, res: Response) => {
   try {
@@ -34,7 +32,6 @@ router.get("/check-username", async (req: Request, res: Response) => {
     res.json({
       available: !existing,
     });
-
   } catch (err) {
     console.error("USERNAME CHECK ERROR:", err);
 
@@ -45,13 +42,9 @@ router.get("/check-username", async (req: Request, res: Response) => {
 });
 
 /**
- * PROFILE
+ * PROFILE (ONLY ONE ROUTE)
  */
-router.get("/edit", requireUser, editProfile);
-
-/* Allow both routes so frontend works */
 router.put("/profile", requireUser, updateProfile);
-router.put("/update", requireUser, updateProfile);
 
 /**
  * PHOTOS

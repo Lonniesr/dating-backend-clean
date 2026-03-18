@@ -20,7 +20,11 @@ export default async function updateProfile(
       bio,
       birthplace,
       location,
+      preferences,
+      prompts,
     } = req.body;
+
+    console.log("📥 UPDATE PAYLOAD:", req.body);
 
     /* ===============================
        BUILD SAFE UPDATE OBJECT
@@ -53,6 +57,33 @@ export default async function updateProfile(
     }
 
     /* ===============================
+       🔥 HANDLE PREFERENCES
+    =============================== */
+
+    if (preferences && typeof preferences === "object") {
+      data.preferences = {
+        interestedIn: preferences.interestedIn || null,
+        racePreference: preferences.racePreference || null,
+        minAge: Number(preferences.minAge) || 18,
+        maxAge: Number(preferences.maxAge) || 40,
+        locationRadius:
+          preferences.locationRadius === null
+            ? null
+            : Number(preferences.locationRadius) || 50,
+      };
+    }
+
+    /* ===============================
+       🔥 HANDLE PROMPTS
+    =============================== */
+
+    if (Array.isArray(prompts)) {
+      data.prompts = prompts;
+    }
+
+    console.log("🛠️ UPDATE DATA:", data);
+
+    /* ===============================
        UPDATE USER
     =============================== */
 
@@ -70,16 +101,19 @@ export default async function updateProfile(
         birthplace: true,
         location: true,
         preferences: true,
+        prompts: true,
         photos: true,
       },
     });
+
+    console.log("✅ PROFILE UPDATED");
 
     return res.json({
       success: true,
       user: updatedUser,
     });
   } catch (err) {
-    console.error("UPDATE PROFILE ERROR:", err);
+    console.error("❌ UPDATE PROFILE ERROR:", err);
 
     return res.status(500).json({
       error: "Server error",

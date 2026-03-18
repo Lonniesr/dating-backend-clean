@@ -92,7 +92,16 @@ router.get(
   requireUser,
   async (req: Request<{ id: string }>, res: Response) => {
     try {
-      const { id } = req.params;
+      let { id } = req.params;
+
+      /* ✅ FIX: normalize id */
+      if (Array.isArray(id)) {
+        id = id[0];
+      }
+
+      if (!id) {
+        return res.status(400).json({ error: "Invalid user id" });
+      }
 
       const user = await prisma.user.findUnique({
         where: { id },
@@ -118,7 +127,7 @@ router.get(
       }
 
       const photos = await prisma.photo.findMany({
-        where: { userId: id },
+        where: { userId: id }, // ✅ now always string
         orderBy: { order: "asc" },
         select: { url: true },
       });

@@ -84,6 +84,78 @@ router.get(
 );
 
 /**
+ * PUT /api/profile
+ * Update logged-in user's profile
+ */
+router.put(
+  "/",
+  requireUser,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const {
+        name,
+        bio,
+        gender,
+        preferences,
+        prompts,
+      } = req.body;
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(bio !== undefined && { bio }),
+          ...(gender !== undefined && { gender }),
+
+          ...(preferences && {
+            preferences: {
+              interestedIn: preferences.interestedIn,
+              racePreference: preferences.racePreference,
+              minAge: Number(preferences.minAge),
+              maxAge: Number(preferences.maxAge),
+              locationRadius:
+                preferences.locationRadius === null
+                  ? null
+                  : Number(preferences.locationRadius),
+            },
+          }),
+
+          ...(prompts && {
+            prompts,
+          }),
+        },
+        select: {
+          id: true,
+          name: true,
+          bio: true,
+          gender: true,
+          preferences: true,
+          prompts: true,
+        },
+      });
+
+      return res.json({
+        success: true,
+        user: updatedUser,
+      });
+
+    } catch (err) {
+      console.error("PROFILE UPDATE ERROR:", err);
+
+      return res.status(500).json({
+        error: "Server error",
+      });
+    }
+  }
+);
+
+/**
  * GET /api/profile/:id
  * View another user's public profile
  */
@@ -94,7 +166,6 @@ router.get(
     try {
       let { id } = req.params;
 
-      /* ✅ FIX: normalize id */
       if (Array.isArray(id)) {
         id = id[0];
       }
@@ -127,7 +198,7 @@ router.get(
       }
 
       const photos = await prisma.photo.findMany({
-        where: { userId: id }, // ✅ now always string
+        where: { userId: id },
         orderBy: { order: "asc" },
         select: { url: true },
       });

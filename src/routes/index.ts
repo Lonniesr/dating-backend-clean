@@ -55,6 +55,9 @@ import adminMessagesRoutes from "../modules/admin/routes/admin.messages";
 import adminSettingsRoutes from "../modules/admin/routes/admin.settings";
 import analyticsRouter from "../modules/admin/routes/admin.analytics";
 
+/* 🔥 NEW: ADMIN SEARCH */
+import adminSearchRoutes from "../modules/admin/routes/admin.search";
+
 const router = Router();
 
 /* =========================
@@ -87,9 +90,7 @@ router.use("/notifications", notificationsRoutes);
 router.use("/user/verify", verificationRoutes);
 
 /**
- * ✅ SELFIE VERIFICATION (CONFIRMED MOUNT)
- * FINAL ENDPOINT:
- * POST /api/user/selfie-verification
+ * ✅ SELFIE VERIFICATION
  */
 router.use("/user/selfie-verification", selfieVerificationRoutes);
 
@@ -97,11 +98,6 @@ router.use("/user/selfie-verification", selfieVerificationRoutes);
    INVITE SYSTEM
 ========================= */
 
-/**
- * IMPORTANT:
- * Specific invite routes must come BEFORE
- * the dynamic /:code route
- */
 router.use("/invite", inviteRoutes);
 router.use("/invite", publicInviteRoutes);
 
@@ -141,6 +137,10 @@ router.use("/admin/bans", adminBansRoutes);
 router.use("/admin/swipe", adminSwipeRoutes);
 router.use("/admin/matches", adminMatchesRoutes);
 router.use("/admin/verification", adminVerificationRoutes);
+
+/* 🔥 NEW: ADMIN SEARCH (THIS IS THE IMPORTANT LINE) */
+router.use("/admin/search", adminSearchRoutes);
+
 router.use("/admin/messages", adminMessagesRoutes);
 router.use("/admin/settings", adminSettingsRoutes);
 router.use("/admin/analytics", analyticsRouter);

@@ -11,11 +11,16 @@ const router = Router();
 router.get("/", requireAdmin, async (_req, res) => {
   try {
     const { data, error } = await supabase
-      .from("users")
+      .from("User") // ✅ FIXED
       .select("id, name, username, verification_selfie, verification_status")
       .eq("verification_status", "pending");
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Fetch error FULL:", error);
+      throw error;
+    }
+
+    console.log("📦 Verification queue:", data); // ✅ DEBUG
 
     res.json(data);
   } catch (err) {
@@ -32,15 +37,20 @@ router.post("/:id/approve", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log("✅ Approving user:", id);
+
     const { error } = await supabase
-      .from("users")
+      .from("User") // ✅ FIXED
       .update({
         verified: true,
         verification_status: "approved",
       })
       .eq("id", id);
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Approve error FULL:", error);
+      throw error;
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -57,15 +67,20 @@ router.post("/:id/reject", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log("❌ Rejecting user:", id);
+
     const { error } = await supabase
-      .from("users")
+      .from("User") // ✅ FIXED
       .update({
         verified: false,
         verification_status: "rejected",
       })
       .eq("id", id);
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Reject error FULL:", error);
+      throw error;
+    }
 
     res.json({ success: true });
   } catch (err) {

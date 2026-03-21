@@ -7,13 +7,11 @@ function getConversationRoom(a: string, b: string) {
 }
 
 export function registerChatSocket(io: Server) {
-  const nsp = io.of("/chat");
-
-  nsp.use(socketAuth());
+  io.use(socketAuth());
 
   const onlineUsers = new Set<string>();
 
-  nsp.on("connection", async (socket: Socket) => {
+  io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
     if (!userId) {
@@ -27,14 +25,24 @@ export function registerChatSocket(io: Server) {
 
     socket.join(`user:${userId}`);
 
-    nsp.emit("presence:update", {
+    io.emit("presence:update", {
       userId,
       online: true,
     });
 
-    // =========================
-    // JOIN CONVERSATION
-    // =========================
+    /* =========================
+       JOIN USER ROOM (NEW)
+    ========================= */
+
+    socket.on("chat:join", (id: string) => {
+      if (!id) return;
+      socket.join(`user:${id}`);
+    });
+
+    /* =========================
+       JOIN CONVERSATION
+    ========================= */
+
     socket.on("conversation:join", ({ otherUserId }) => {
       if (!otherUserId) return;
 
@@ -42,9 +50,10 @@ export function registerChatSocket(io: Server) {
       socket.join(room);
     });
 
-    // =========================
-    // SEND MESSAGE
-    // =========================
+    /* =========================
+       SEND MESSAGE
+    ========================= */
+
     socket.on(
       "message:send",
       async ({ receiverId, text }: { receiverId: string; text: string }) => {
@@ -100,32 +109,30 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
-          // Emit message
-          nsp.to(room).emit("message:new", message);
+          io.to(room).emit("message:new", message);
 
-          // Update receiver conversation preview
-          nsp.to(`user:${receiverId}`).emit("conversation:update", {
+          io.to(`user:${receiverId}`).emit("conversation:update", {
             conversationId: conversation.id,
             message,
           });
 
-          // Trigger notification update
-          nsp.to(`user:${receiverId}`).emit("notifications:update");
+          io.to(`user:${receiverId}`).emit("notifications:update");
         } catch (err) {
           console.error("CHAT MESSAGE ERROR:", err);
         }
       }
     );
 
-    // =========================
-    // TYPING
-    // =========================
+    /* =========================
+       TYPING
+    ========================= */
+
     socket.on("typing:start", ({ toUserId }) => {
       if (!toUserId) return;
 
       const room = getConversationRoom(userId, toUserId);
 
-      nsp.to(room).emit("typing:start", {
+      io.to(room).emit("typing:start", {
         fromUserId: userId,
       });
     });
@@ -135,14 +142,15 @@ export function registerChatSocket(io: Server) {
 
       const room = getConversationRoom(userId, toUserId);
 
-      nsp.to(room).emit("typing:stop", {
+      io.to(room).emit("typing:stop", {
         fromUserId: userId,
       });
     });
 
-    // =========================
-    // READ RECEIPTS
-    // =========================
+    /* =========================
+       READ RECEIPTS
+    ========================= */
+
     socket.on("message:read", async ({ otherUserId }) => {
       if (!otherUserId) return;
 
@@ -157,22 +165,23 @@ export function registerChatSocket(io: Server) {
 
       const room = getConversationRoom(userId, otherUserId);
 
-      nsp.to(room).emit("message:read:update", {
+      io.to(room).emit("message:read:update", {
         readerId: userId,
       });
 
-      nsp.to(`user:${otherUserId}`).emit("notifications:update");
+      io.to(`user:${otherUserId}`).emit("notifications:update");
     });
 
-    // =========================
-    // DISCONNECT
-    // =========================
+    /* =========================
+       DISCONNECT
+    ========================= */
+
     socket.on("disconnect", () => {
       console.log("💬 Chat disconnected:", userId);
 
       onlineUsers.delete(userId);
 
-      nsp.emit("presence:update", {
+      io.emit("presence:update", {
         userId,
         online: false,
       });

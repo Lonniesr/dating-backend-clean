@@ -56,10 +56,8 @@ function getToken(req: Request): string | undefined {
 function getUserIdFromPayload(
   payload: string | JwtPayload
 ): string | undefined {
-
   if (typeof payload === "string") return undefined;
 
-  /* support both old and new tokens */
   if (typeof payload.sub === "string" && payload.sub) {
     return payload.sub;
   }
@@ -82,9 +80,7 @@ export async function requireUser(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-
   try {
-
     const token = getToken(req);
 
     if (!token) {
@@ -119,37 +115,36 @@ export async function requireUser(
       return;
     }
 
-   /* =========================
-   ONBOARDING GUARD
-========================= */
+    /* =========================
+       ONBOARDING GUARD
+    ========================= */
 
-const path = req.originalUrl;
+    const path = req.originalUrl;
 
-/**
- * Routes allowed before onboarding completes
- */
-const allowedBeforeOnboarding =
-  path.startsWith("/api/onboarding") ||
-  path.startsWith("/api/profile") ||
-  path.startsWith("/api/auth") ||
-  path.startsWith("/api/user") ||     // <-- allows preferences, prompts, profile updates
-  path.startsWith("/api/upload") ||
-  path.startsWith("/api/user/photos");
+    /**
+     * Routes allowed before onboarding completes
+     */
+    const allowedBeforeOnboarding =
+      path.startsWith("/api/onboarding") ||
+      path.startsWith("/api/profile") ||
+      path.startsWith("/api/auth") ||
+      path.startsWith("/api/user") ||
+      path.startsWith("/api/upload") ||
+      path.startsWith("/api/user/photos") ||
+      path.startsWith("/api/feedback"); // ✅ FIX ADDED HERE
 
-if (!user.onboardingComplete && !allowedBeforeOnboarding) {
-  res.status(403).json({
-    error: "Onboarding incomplete",
-    onboardingRequired: true,
-  });
-  return;
-}
+    if (!user.onboardingComplete && !allowedBeforeOnboarding) {
+      res.status(403).json({
+        error: "Onboarding incomplete",
+        onboardingRequired: true,
+      });
+      return;
+    }
 
     req.user = user;
 
     next();
-
   } catch (err) {
-
     console.error("AUTH ERROR:", err);
 
     res.status(401).json({ error: "Unauthorized" });

@@ -85,6 +85,12 @@ router.use("/notifications", notificationsRoutes);
 ========================= */
 
 router.use("/user/verify", verificationRoutes);
+
+/**
+ * ✅ SELFIE VERIFICATION (CONFIRMED MOUNT)
+ * FINAL ENDPOINT:
+ * POST /api/user/selfie-verification
+ */
 router.use("/user/selfie-verification", selfieVerificationRoutes);
 
 /* =========================
@@ -96,7 +102,6 @@ router.use("/user/selfie-verification", selfieVerificationRoutes);
  * Specific invite routes must come BEFORE
  * the dynamic /:code route
  */
-
 router.use("/invite", inviteRoutes);
 router.use("/invite", publicInviteRoutes);
 

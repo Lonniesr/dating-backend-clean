@@ -35,7 +35,7 @@ router.post("/", requireUser, async (req, res) => {
     console.log("🛠️ Updating user verification fields...");
 
     const { data, error } = await supabase
-      .from("users")
+      .from("User") // ✅ FIXED TABLE NAME
       .update({
         verification_selfie: selfieUrl,
         verification_status: "pending",

@@ -4,11 +4,6 @@ import { requireAdmin } from "../../../middleware/requireAdmin";
 
 const router = Router();
 
-/*
-GET /api/admin/search?q=...
-Search users by name, username, email, or ID
-*/
-
 router.get("/", requireAdmin, async (req, res) => {
   try {
     const q = (req.query.q as string)?.trim();
@@ -20,26 +15,22 @@ router.get("/", requireAdmin, async (req, res) => {
     console.log("🔍 Admin search query:", q);
 
     const { data, error } = await supabase
-      .from("User") // ✅ IMPORTANT
+      .from("User")
       .select("id, name, username, email, photos, verification_status")
-      .or(`
-        username.ilike.%${q}%,
-        name.ilike.%${q}%,
-        email.ilike.%${q}%
-      `);
+      .or(`username.ilike.%${q}%,name.ilike.%${q}%,email.ilike.%${q}%`); // ✅ FIXED
 
     if (error) {
-      console.error("❌ Search error:", error);
-      throw error;
+      console.error("❌ Supabase search error:", error);
+      return res.status(500).json({ message: error.message });
     }
 
-    res.json({
-      results: data || [],
-    });
+    console.log("✅ Search results:", data);
 
-  } catch (err) {
-    console.error("🔥 Admin search failed:", err);
-    res.status(500).json({ message: "Search failed" });
+    res.json({ results: data || [] });
+
+  } catch (err: any) {
+    console.error("🔥 Admin search crash:", err);
+    res.status(500).json({ message: err?.message || "Search failed" });
   }
 });
 

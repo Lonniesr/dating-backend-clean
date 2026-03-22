@@ -100,6 +100,34 @@ router.get(
       console.log("🔥 RAW USER FROM PRISMA:", user);
 
       /* =========================
+         CALCULATE AGE
+      ========================= */
+
+      let age: number | null = null;
+
+      if (user.birthdate) {
+        const birth = new Date(user.birthdate);
+        const today = new Date();
+
+        age = today.getFullYear() - birth.getFullYear();
+
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+          age--;
+        }
+      }
+
+      /* =========================
+         DERIVE LOCATION (coords)
+      ========================= */
+
+      let location: string | null = null;
+
+      if ((user as any).latitude && (user as any).longitude) {
+        location = `${(user as any).latitude}, ${(user as any).longitude}`;
+      }
+
+      /* =========================
          GET PHOTOS
       ========================= */
 
@@ -141,18 +169,16 @@ router.get(
       });
 
       /* =========================
-         FINAL RESPONSE (FIXED)
+         FINAL RESPONSE
       ========================= */
 
       const formatted = {
         id: user.id,
 
-        // ✅ NAME FIX
         name: user.name || user.username || "Unnamed User",
         username: user.username,
         email: user.email,
 
-        // ✅ DATE FIX
         createdAt: user.createdAt ?? new Date().toISOString(),
         lastActiveAt: user.lastActiveAt ?? null,
 
@@ -160,10 +186,9 @@ router.get(
         banned: user.banned,
         role: user.role,
 
-        age: null,
-        location: (user as any).location ?? null,
+        age,
+        location,
 
-        // ✅ SAFE ARRAYS
         photos: photos?.map((p) => p.url) || [],
         matches: matches || [],
       };

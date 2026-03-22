@@ -32,18 +32,9 @@ router.get(
       if (search) {
         where = {
           OR: [
-            {
-              email: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
-            {
-              name: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
+            { email: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+            { username: { contains: search, mode: "insensitive" } },
           ],
         };
       }
@@ -57,6 +48,7 @@ router.get(
           id: true,
           email: true,
           name: true,
+          username: true,
           role: true,
           verified: true,
           banned: true,
@@ -89,15 +81,86 @@ router.get(
   requireAdmin,
   async (req: Request<{ id: string }>, res: Response) => {
     try {
+      const userId = req.params.id;
+
+      console.log("🔍 Fetching admin user:", userId);
+
+      /* =========================
+         GET USER
+      ========================= */
+
       const user = await prisma.user.findUnique({
-        where: { id: req.params.id },
+        where: { id: userId },
       });
 
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      return res.json(user);
+      /* =========================
+         GET PHOTOS
+      ========================= */
+
+      const photos = await prisma.photo.findMany({
+        where: { userId },
+        select: { url: true },
+      });
+
+      /* =========================
+         GET MATCHES
+      ========================= */
+
+      const matchesRaw = await prisma.match.findMany({
+        where: {
+          OR: [
+            { userAId: userId },
+            { userBId: userId },
+          ],
+        },
+        include: {
+          userA: { select: { id: true, name: true } },
+          userB: { select: { id: true, name: true } },
+        },
+      });
+
+      const matches = matchesRaw.map((m) => {
+        const isUserA = m.userAId === userId;
+
+        return {
+          id: m.id,
+          otherUserId: isUserA ? m.userB.id : m.userA.id,
+          otherUserName: isUserA ? m.userB.name : m.userA.name,
+          createdAt: m.createdAt,
+        };
+      });
+
+      /* =========================
+         FINAL RESPONSE
+      ========================= */
+
+      const formatted = {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+
+        createdAt: user.createdAt,
+        lastActiveAt: user.lastActiveAt,
+
+        verified: user.verified,
+        banned: user.banned,
+        role: user.role,
+
+        age: null,
+        location: (user as any).location ?? null,
+
+        photos: photos.map((p) => p.url),
+        matches,
+      };
+
+      console.log("✅ Admin user detail response:", formatted);
+
+      return res.json(formatted);
     } catch (err) {
       console.error("ADMIN USER DETAIL ERROR:", err);
       return res.status(500).json({ error: "Server error" });

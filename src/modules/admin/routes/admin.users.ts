@@ -97,6 +97,8 @@ router.get(
         return res.status(404).json({ error: "User not found" });
       }
 
+      console.log("🔥 RAW USER FROM PRISMA:", user);
+
       /* =========================
          GET PHOTOS
       ========================= */
@@ -106,16 +108,15 @@ router.get(
         select: { url: true },
       });
 
+      console.log("🔥 PHOTOS:", photos);
+
       /* =========================
          GET MATCHES
       ========================= */
 
       const matchesRaw = await prisma.match.findMany({
         where: {
-          OR: [
-            { userAId: userId },
-            { userBId: userId },
-          ],
+          OR: [{ userAId: userId }, { userBId: userId }],
         },
         include: {
           userA: { select: { id: true, name: true } },
@@ -123,29 +124,37 @@ router.get(
         },
       });
 
+      console.log("🔥 MATCHES RAW:", matchesRaw);
+
       const matches = matchesRaw.map((m) => {
         const isUserA = m.userAId === userId;
 
         return {
           id: m.id,
           otherUserId: isUserA ? m.userB.id : m.userA.id,
-          otherUserName: isUserA ? m.userB.name : m.userA.name,
+          otherUserName:
+            isUserA
+              ? m.userB.name || "User"
+              : m.userA.name || "User",
           createdAt: m.createdAt,
         };
       });
 
       /* =========================
-         FINAL RESPONSE
+         FINAL RESPONSE (FIXED)
       ========================= */
 
       const formatted = {
         id: user.id,
-        name: user.name,
+
+        // ✅ NAME FIX
+        name: user.name || user.username || "Unnamed User",
         username: user.username,
         email: user.email,
 
-        createdAt: user.createdAt,
-        lastActiveAt: user.lastActiveAt,
+        // ✅ DATE FIX
+        createdAt: user.createdAt ?? new Date().toISOString(),
+        lastActiveAt: user.lastActiveAt ?? null,
 
         verified: user.verified,
         banned: user.banned,
@@ -154,11 +163,12 @@ router.get(
         age: null,
         location: (user as any).location ?? null,
 
-        photos: photos.map((p) => p.url),
-        matches,
+        // ✅ SAFE ARRAYS
+        photos: photos?.map((p) => p.url) || [],
+        matches: matches || [],
       };
 
-      console.log("✅ Admin user detail response:", formatted);
+      console.log("✅ FINAL RESPONSE:", formatted);
 
       return res.json(formatted);
     } catch (err) {

@@ -6,33 +6,18 @@ const router = Router();
 
 /**
  * POST /api/user/photos/upload
- * Save photo URL to DB
  */
 router.post("/upload", requireUser, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-
-    console.log("📸 PHOTO UPLOAD HIT");
-    console.log("📸 USER ID:", userId);
-    console.log("📸 BODY:", req.body);
-
     const { url } = req.body || {};
 
-    if (!userId) {
-      console.log("❌ Upload failed: no user ID");
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
     if (!url || typeof url !== "string") {
-      console.log("❌ Upload failed: invalid URL", url);
       return res.status(400).json({ error: "Invalid photo URL" });
     }
 
-    const count = await prisma.photo.count({
-      where: { userId },
-    });
-
-    console.log("📸 Existing photo count:", count);
+    const count = await prisma.photo.count({ where: { userId } });
 
     await prisma.photo.create({
       data: {
@@ -42,15 +27,11 @@ router.post("/upload", requireUser, async (req: Request, res: Response) => {
       },
     });
 
-    console.log("✅ Photo saved:", url);
-
     const photos = await prisma.photo.findMany({
       where: { userId },
       orderBy: { order: "asc" },
       select: { url: true },
     });
-
-    console.log("📸 Returning photos:", photos);
 
     res.json({
       success: true,
@@ -58,45 +39,55 @@ router.post("/upload", requireUser, async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("🔥 PHOTO UPLOAD ERROR:", err);
-
-    res.status(500).json({
-      error: "Failed to upload photo",
-    });
+    res.status(500).json({ error: "Failed to upload photo" });
   }
 });
 
 /**
- * DELETE /api/user/photos/:index
+ * ✅ FIXED DELETE (URL-BASED)
+ * DELETE /api/user/photos
  */
-router.delete("/:index", requireUser, async (req: Request, res: Response) => {
+router.delete("/", requireUser, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
-    const index = Number(req.params.index);
+    const { url } = req.body;
 
-    console.log("🗑 DELETE PHOTO");
+    console.log("🗑 DELETE PHOTO (URL)");
     console.log("USER:", userId);
-    console.log("INDEX:", index);
+    console.log("URL:", url);
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const photo = await prisma.photo.findFirst({
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ error: "Photo URL required" });
+    }
+
+    const deleted = await prisma.photo.deleteMany({
       where: {
         userId,
-        order: index,
+        url,
       },
     });
 
-    console.log("PHOTO FOUND:", photo);
+    console.log("🧾 Deleted count:", deleted.count);
 
-    if (!photo) {
-      return res.status(404).json({ error: "Photo not found" });
-    }
+    /* =========================
+       REORDER AFTER DELETE
+    ========================= */
 
-    await prisma.photo.delete({
-      where: { id: photo.id },
+    const remaining = await prisma.photo.findMany({
+      where: { userId },
+      orderBy: { order: "asc" },
     });
+
+    for (let i = 0; i < remaining.length; i++) {
+      await prisma.photo.update({
+        where: { id: remaining[i].id },
+        data: { order: i },
+      });
+    }
 
     const photos = await prisma.photo.findMany({
       where: { userId },
@@ -110,10 +101,7 @@ router.delete("/:index", requireUser, async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("🔥 DELETE PHOTO ERROR:", err);
-
-    res.status(500).json({
-      error: "Failed to delete photo",
-    });
+    res.status(500).json({ error: "Failed to delete photo" });
   }
 });
 
@@ -124,10 +112,6 @@ router.put("/reorder", requireUser, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?.id;
     const { order } = req.body;
-
-    console.log("🔄 REORDER PHOTOS");
-    console.log("USER:", userId);
-    console.log("NEW ORDER:", order);
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -161,10 +145,7 @@ router.put("/reorder", requireUser, async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("🔥 REORDER PHOTO ERROR:", err);
-
-    res.status(500).json({
-      error: "Failed to reorder photos",
-    });
+    res.status(500).json({ error: "Failed to reorder photos" });
   }
 });
 

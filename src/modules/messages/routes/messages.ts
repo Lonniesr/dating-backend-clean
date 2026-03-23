@@ -113,6 +113,24 @@ router.post("/:id", requireUser, async (req: any, res) => {
         ? conversation.userBId
         : conversation.userAId;
 
+    /* =========================
+       BLOCK CHECK (ADDED)
+    ========================= */
+    const blocked = await prisma.block.findFirst({
+      where: {
+        OR: [
+          { blockerId: senderId, blockedId: receiverId },
+          { blockerId: receiverId, blockedId: senderId },
+        ],
+      },
+    });
+
+    if (blocked) {
+      return res.status(403).json({
+        message: "You cannot message this user.",
+      });
+    }
+
     const message = await prisma.message.create({
       data: {
         senderId,

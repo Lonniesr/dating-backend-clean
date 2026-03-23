@@ -58,6 +58,13 @@ import analyticsRouter from "../modules/admin/routes/admin.analytics";
 /* 🔥 NEW: ADMIN SEARCH */
 import adminSearchRoutes from "../modules/admin/routes/admin.search";
 
+/* =========================
+   NEW: BLOCK & REPORT ROUTES
+========================= */
+
+import blockRoutes from "../modules/user/routes/block";
+import reportRoutes from "../modules/user/routes/report";
+
 const router = Router();
 
 /* =========================
@@ -74,6 +81,10 @@ router.use("/onboarding", onboardingRoutes);
 
 router.use("/user", userRoutes);
 router.use("/profile", profileRoutes);
+
+/* ✅ NEW ROUTES REGISTERED */
+router.use("/block", blockRoutes);
+router.use("/report", reportRoutes);
 
 router.use("/user/photos", photosRouter);
 router.use("/user/profile-completion", profileCompletionRoutes);

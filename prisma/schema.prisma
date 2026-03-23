@@ -76,7 +76,6 @@ model User {
 
   notifications      Notification[]
 
-  /* ✅ FEEDBACK RELATION */
   feedbacks          Feedback[]
 
   @@index([latitude, longitude])
@@ -284,4 +283,33 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+/* =========================
+   NEW: BLOCK SYSTEM
+========================= */
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+/* =========================
+   NEW: REPORT SYSTEM
+========================= */
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String
+  reportedId  String
+  reason      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([reporterId])
+  @@index([reportedId])
 }

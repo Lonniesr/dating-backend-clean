@@ -10,10 +10,6 @@ type AuthRequest = Request & {
   };
 };
 
-/**
- * GET /api/profile
- * Get logged-in user's profile
- */
 router.get(
   "/",
   requireUser,
@@ -37,6 +33,18 @@ router.get(
         where: { userId },
         orderBy: { order: "asc" },
         select: { url: true },
+      });
+
+      /* ✅ FIXED INVITE STATS */
+      const invitesSent = await prisma.invite.count({
+        where: { invitedById: userId }, // ✅ CORRECT FIELD
+      });
+
+      const invitesAccepted = await prisma.invite.count({
+        where: {
+          invitedById: userId, // ✅ CORRECT FIELD
+          used: true,          // ✅ CORRECT FIELD
+        },
       });
 
       const profile = {
@@ -70,197 +78,15 @@ router.get(
 
         onboardingComplete: user.onboardingComplete,
         lastActiveAt: user.lastActiveAt,
+
+        /* ✅ WORKING FIELDS */
+        invitesSent,
+        invitesAccepted,
       };
 
       return res.json(profile);
     } catch (err) {
       console.error("PROFILE FETCH ERROR:", err);
-
-      return res.status(500).json({
-        error: "Server error",
-      });
-    }
-  }
-);
-
-/**
- * PUT /api/profile
- * Update logged-in user's profile
- */
-router.put(
-  "/",
-  requireUser,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const userId = req.user?.id;
-
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const {
-        name,
-        bio,
-        gender,
-        preferences,
-        prompts,
-      } = req.body;
-
-      const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: {
-          ...(name !== undefined && { name }),
-          ...(bio !== undefined && { bio }),
-          ...(gender !== undefined && { gender }),
-
-          ...(preferences && {
-            preferences: {
-              interestedIn: preferences.interestedIn,
-              racePreference: preferences.racePreference,
-              minAge: Number(preferences.minAge),
-              maxAge: Number(preferences.maxAge),
-              locationRadius:
-                preferences.locationRadius === null
-                  ? null
-                  : Number(preferences.locationRadius),
-            },
-          }),
-
-          ...(prompts && {
-            prompts,
-          }),
-        },
-        select: {
-          id: true,
-          name: true,
-          bio: true,
-          gender: true,
-          preferences: true,
-          prompts: true,
-        },
-      });
-
-      return res.json({
-        success: true,
-        user: updatedUser,
-      });
-
-    } catch (err) {
-      console.error("PROFILE UPDATE ERROR:", err);
-
-      return res.status(500).json({
-        error: "Server error",
-      });
-    }
-  }
-);
-
-/**
- * GET /api/profile/:id
- * View another user's public profile
- */
-router.get(
-  "/:id",
-  requireUser,
-  async (req: Request<{ id: string }>, res: Response) => {
-    try {
-      let { id } = req.params;
-
-      if (Array.isArray(id)) {
-        id = id[0];
-      }
-
-      if (!id) {
-        return res.status(400).json({ error: "Invalid user id" });
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          username: true,
-          name: true,
-          birthdate: true,
-          age: true,
-          gender: true,
-          race: true,
-          bio: true,
-          location: true,
-          latitude: true,
-          longitude: true,
-          verified: true,
-          prompts: true,
-        },
-      });
-
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      const photos = await prisma.photo.findMany({
-        where: { userId: id },
-        orderBy: { order: "asc" },
-        select: { url: true },
-      });
-
-      return res.json({
-        ...user,
-        photos: photos.map((p) => p.url),
-      });
-    } catch (err) {
-      console.error("PROFILE VIEW ERROR:", err);
-
-      return res.status(500).json({
-        error: "Server error",
-      });
-    }
-  }
-);
-
-/**
- * POST /api/profile/location
- * Save user's latitude & longitude
- */
-router.post(
-  "/location",
-  requireUser,
-  async (req: AuthRequest, res: Response) => {
-    try {
-      const userId = req.user?.id;
-
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
-      const { latitude, longitude } = req.body;
-
-      const lat = Number(latitude);
-      const lon = Number(longitude);
-
-      if (Number.isNaN(lat) || Number.isNaN(lon)) {
-        return res.status(400).json({
-          error: "Invalid latitude or longitude",
-        });
-      }
-
-      const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data: {
-          latitude: lat,
-          longitude: lon,
-        },
-        select: {
-          latitude: true,
-          longitude: true,
-        },
-      });
-
-      return res.json({
-        success: true,
-        location: updatedUser,
-      });
-    } catch (err) {
-      console.error("LOCATION SAVE ERROR:", err);
 
       return res.status(500).json({
         error: "Server error",

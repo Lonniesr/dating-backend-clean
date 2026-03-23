@@ -10,6 +10,9 @@ type AuthRequest = Request & {
   };
 };
 
+/* =========================
+   GET PROFILE
+========================= */
 router.get(
   "/",
   requireUser,
@@ -35,15 +38,15 @@ router.get(
         select: { url: true },
       });
 
-      /* ✅ FIXED INVITE STATS */
+      /* ✅ INVITE STATS */
       const invitesSent = await prisma.invite.count({
-        where: { invitedById: userId }, // ✅ CORRECT FIELD
+        where: { invitedById: userId },
       });
 
       const invitesAccepted = await prisma.invite.count({
         where: {
-          invitedById: userId, // ✅ CORRECT FIELD
-          used: true,          // ✅ CORRECT FIELD
+          invitedById: userId,
+          used: true,
         },
       });
 
@@ -79,7 +82,6 @@ router.get(
         onboardingComplete: user.onboardingComplete,
         lastActiveAt: user.lastActiveAt,
 
-        /* ✅ WORKING FIELDS */
         invitesSent,
         invitesAccepted,
       };
@@ -90,6 +92,48 @@ router.get(
 
       return res.status(500).json({
         error: "Server error",
+      });
+    }
+  }
+);
+
+/* =========================
+   UPDATE PROFILE
+========================= */
+router.put(
+  "/",
+  requireUser,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const {
+        bio,
+        gender,
+        preferences,
+        prompts,
+      } = req.body;
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          bio,
+          gender,
+          preferences,
+          prompts,
+        },
+      });
+
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("PROFILE UPDATE ERROR:", err);
+
+      return res.status(500).json({
+        error: "Failed to update profile",
       });
     }
   }

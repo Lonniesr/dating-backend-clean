@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { AuthUser } from "./auth";
+import { AuthUser } from "../middleware/requireUser"; // ✅ FIXED PATH
 
 declare global {
   namespace Express {

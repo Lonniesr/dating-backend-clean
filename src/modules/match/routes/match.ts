@@ -19,6 +19,29 @@ router.get(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
+      /* =========================
+         NEW: BLOCK LOOKUP
+      ========================= */
+      const blocks = await prisma.block.findMany({
+        where: {
+          OR: [
+            { blockerId: userId },
+            { blockedId: userId }
+          ]
+        },
+        select: {
+          blockerId: true,
+          blockedId: true
+        }
+      });
+
+      const blockedIds = new Set<string>();
+
+      for (const b of blocks) {
+        if (b.blockerId === userId) blockedIds.add(b.blockedId);
+        if (b.blockedId === userId) blockedIds.add(b.blockerId);
+      }
+
       const matches = await prisma.match.findMany({
         where: {
           OR: [{ userAId: userId }, { userBId: userId }],
@@ -54,19 +77,24 @@ router.get(
         },
       });
 
-      const normalized = matches.map((match) => {
-        const otherUser =
-          match.userAId === userId ? match.userB : match.userA;
+      const normalized = matches
+        .map((match) => {
+          const otherUser =
+            match.userAId === userId ? match.userB : match.userA;
 
-        return {
-          id: otherUser.id,
-          name: otherUser.name,
-          gender: otherUser.gender,
-          location: otherUser.location,
-          birthdate: otherUser.birthdate,
-          photos: otherUser.photos.map((p) => p.url),
-        };
-      });
+          return {
+            id: otherUser.id,
+            name: otherUser.name,
+            gender: otherUser.gender,
+            location: otherUser.location,
+            birthdate: otherUser.birthdate,
+            photos: otherUser.photos.map((p) => p.url),
+          };
+        })
+        /* =========================
+           NEW: FILTER BLOCKED
+        ========================= */
+        .filter((u) => !blockedIds.has(u.id));
 
       res.json(normalized);
 

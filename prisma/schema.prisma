@@ -78,6 +78,10 @@ model User {
 
   feedbacks          Feedback[]
 
+  /* ✅ NEW: BLOCK RELATIONS */
+  blockedUsers       Block[] @relation("Blocker")
+  blockedByUsers     Block[] @relation("Blocked")
+
   @@index([latitude, longitude])
 }
 
@@ -286,13 +290,18 @@ model Notification {
 }
 
 /* =========================
-   NEW: BLOCK SYSTEM
+   BLOCK SYSTEM (FIXED)
 ========================= */
 model Block {
   id        String   @id @default(uuid())
+
   blockerId String
   blockedId String
+
   createdAt DateTime @default(now())
+
+  blocker   User @relation("Blocker", fields: [blockerId], references: [id])
+  blocked   User @relation("Blocked", fields: [blockedId], references: [id])
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
@@ -300,7 +309,7 @@ model Block {
 }
 
 /* =========================
-   NEW: REPORT SYSTEM
+   REPORT SYSTEM
 ========================= */
 model Report {
   id          String   @id @default(uuid())

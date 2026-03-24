@@ -127,12 +127,39 @@ router.get(
       }
 
       /**
+       * =========================
+       * NEW: BLOCK LOOKUP
+       * =========================
+       */
+
+      const blocks = await prisma.block.findMany({
+        where: {
+          OR: [
+            { blockerId: userId },
+            { blockedId: userId }
+          ]
+        },
+        select: {
+          blockerId: true,
+          blockedId: true
+        }
+      });
+
+      const blockedIds = new Set<string>();
+
+      for (const b of blocks) {
+        if (b.blockerId === userId) blockedIds.add(b.blockedId);
+        if (b.blockedId === userId) blockedIds.add(b.blockerId);
+      }
+
+      /**
        * EXCLUDED USERS
        */
 
       const excludedIds = [
         ...Array.from(swipedIds),
-        ...Array.from(matchedIds)
+        ...Array.from(matchedIds),
+        ...Array.from(blockedIds) // ✅ ADDED
       ].slice(0, 500);
 
       /**
@@ -181,10 +208,7 @@ router.get(
         .map((user) => {
           let score = 0;
 
-          /* PRIORITIZE USERS WHO LIKED YOU */
           if (likedYouSet.has(user.id)) score += 500;
-
-          /* GENDER COMPATIBILITY */
 
           if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
             if (
@@ -196,8 +220,6 @@ router.get(
               score -= 40;
             }
           }
-
-          /* AGE COMPATIBILITY */
 
           if (user.birthdate) {
             const age =
@@ -215,8 +237,6 @@ router.get(
             }
           }
 
-          /* ACTIVITY BOOST */
-
           if (user.lastActiveAt) {
             const hours =
               (Date.now() - new Date(user.lastActiveAt).getTime()) /
@@ -225,15 +245,9 @@ router.get(
             score += Math.max(0, 100 - hours);
           }
 
-          /* PHOTO BOOST */
-
           score += (user.photos?.length || 0) * 10;
 
-          /* ELO BOOST */
-
           score += user.eloScore * 0.05;
-
-          /* DISTANCE SCORING */
 
           if (
             currentUser.latitude &&
@@ -250,8 +264,6 @@ router.get(
 
             score += Math.max(0, 50 - dist);
           }
-
-          /* RANDOMIZATION */
 
           score += Math.random() * 10;
 

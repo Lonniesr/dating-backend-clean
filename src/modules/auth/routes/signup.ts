@@ -40,12 +40,22 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ reason: "not_found" });
     }
 
-    if (inviteRecord.used) {
+    // 🔥 FIXED: split logic for premium vs normal
+    if (!inviteRecord.premium && inviteRecord.used) {
       return res.status(400).json({ reason: "used" });
     }
 
     if (inviteRecord.expiresAt && inviteRecord.expiresAt < new Date()) {
       return res.status(400).json({ reason: "expired" });
+    }
+
+    // 🔥 NEW: enforce usage limit for premium (if set)
+    if (
+      inviteRecord.premium &&
+      inviteRecord.maxUses !== null &&
+      inviteRecord.usedCount >= inviteRecord.maxUses
+    ) {
+      return res.status(400).json({ reason: "limit_reached" });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -84,15 +94,29 @@ router.post("/", async (req: Request, res: Response) => {
        UPDATE INVITE ANALYTICS
     ========================= */
 
-    await prisma.invite.update({
-      where: { id: inviteRecord.id },
-      data: {
-        used: true,
-        usedAt: new Date(),
-        usedById: user.id,
-        signupCount: { increment: 1 },
-      },
-    });
+    if (inviteRecord.premium) {
+      // 🔥 PREMIUM: increment usage only
+      await prisma.invite.update({
+        where: { id: inviteRecord.id },
+        data: {
+          usedCount: {
+            increment: 1,
+          },
+          signupCount: { increment: 1 },
+        },
+      });
+    } else {
+      // 🟢 NORMAL: keep existing behavior
+      await prisma.invite.update({
+        where: { id: inviteRecord.id },
+        data: {
+          used: true,
+          usedAt: new Date(),
+          usedById: user.id,
+          signupCount: { increment: 1 },
+        },
+      });
+    }
 
     /* =========================
        ISSUE JWT

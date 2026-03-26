@@ -173,6 +173,10 @@ model Invite {
   used       Boolean  @default(false)
   usedAt     DateTime?
 
+  // 🔥 NEW
+  maxUses    Int?
+  usedCount  Int      @default(0)
+
   invitedById String?
   usedById    String?
 

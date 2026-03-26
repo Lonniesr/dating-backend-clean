@@ -113,7 +113,10 @@ router.post("/", requireUser, async (req: any, res: Response) => {
 
     let expiresAt: Date | null = null;
 
-    if (expiresInDays) {
+    // 🔥 DEFAULT: 3 months for premium invites
+    if (premium) {
+      expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90);
+    } else if (expiresInDays) {
       expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
     }
@@ -125,6 +128,10 @@ router.post("/", requireUser, async (req: any, res: Response) => {
         invitedById: userId,
         expiresAt,
         used: false,
+
+        // 🔥 NEW (safe additions)
+        maxUses: premium ? null : 1,
+        usedCount: 0,
       },
     });
 

@@ -11,7 +11,7 @@ type AuthRequest = Request & {
 };
 
 /* =========================
-   GET PROFILE
+   GET CURRENT USER PROFILE
 ========================= */
 router.get(
   "/",
@@ -38,7 +38,6 @@ router.get(
         select: { url: true },
       });
 
-      /* ✅ INVITE STATS */
       const invitesSent = await prisma.invite.count({
         where: { invitedById: userId },
       });
@@ -98,6 +97,64 @@ router.get(
 );
 
 /* =========================
+   GET OTHER USER PROFILE
+========================= */
+router.get(
+  "/:id",
+  requireUser,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const param = req.params.id;
+
+      if (!param || Array.isArray(param)) {
+        return res.status(400).json({ error: "Invalid user id" });
+      }
+
+      const userId = param;
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+
+      const photos = await prisma.photo.findMany({
+        where: { userId },
+        orderBy: { order: "asc" },
+        select: { url: true },
+      });
+
+      const profile = {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        age: user.age,
+        gender: user.gender,
+        race: user.race,
+        bio: user.bio,
+        location: user.location,
+        latitude: user.latitude,
+        longitude: user.longitude,
+        photos: photos.map((p) => p.url),
+        prompts: user.prompts || {},
+        verified: user.verified,
+        verification_status: user.verification_status,
+      };
+
+      return res.json(profile);
+    } catch (err) {
+      console.error("PROFILE BY ID ERROR:", err);
+
+      return res.status(500).json({
+        error: "Server error",
+      });
+    }
+  }
+);
+
+/* =========================
    UPDATE PROFILE
 ========================= */
 router.put(
@@ -111,12 +168,7 @@ router.put(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const {
-        bio,
-        gender,
-        preferences,
-        prompts,
-      } = req.body;
+      const { bio, gender, preferences, prompts } = req.body;
 
       await prisma.user.update({
         where: { id: userId },

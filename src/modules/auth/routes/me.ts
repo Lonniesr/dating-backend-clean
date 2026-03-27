@@ -8,7 +8,7 @@ const router = Router();
  * GET /api/auth/me
  * Returns authenticated user's full onboarding state
  */
-router.get("/", requireUser, async (req: any, res) => {
+router.get("/me", requireUser, async (req: any, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },

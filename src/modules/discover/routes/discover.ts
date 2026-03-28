@@ -43,20 +43,12 @@ router.get(
       const cursor = Number(req.query.cursor || 0);
       const cacheKey = `discover:${userId}:${cursor}`;
 
-      /**
-       * CACHE HIT
-       */
-
       if (redis) {
         const cached = await redis.get(cacheKey);
         if (cached) {
           return res.json(JSON.parse(cached));
         }
       }
-
-      /**
-       * LOAD CURRENT USER
-       */
 
       const currentUser = await prisma.user.findUnique({
         where: { id: userId },
@@ -77,22 +69,19 @@ router.get(
           ? (currentUser.preferences as any)
           : {};
 
-      /**
-       * SWIPES (both directions)
-       */
+      // ✅ NEW: extract preferences safely
+      const onlyVerified = prefs.onlyVerified === true;
+      const anyLocation = prefs.locationRadius === null;
 
       const swipeData = await prisma.swipe.findMany({
         where: {
-          OR: [
-            { swiperId: userId },
-            { targetId: userId }
-          ]
+          OR: [{ swiperId: userId }, { targetId: userId }],
         },
         select: {
           swiperId: true,
           targetId: true,
-          liked: true
-        }
+          liked: true,
+        },
       });
 
       const swipedIds = new Set<string>();
@@ -108,15 +97,11 @@ router.get(
         }
       }
 
-      /**
-       * MATCHES
-       */
-
       const matches = await prisma.match.findMany({
         where: {
-          OR: [{ userAId: userId }, { userBId: userId }]
+          OR: [{ userAId: userId }, { userBId: userId }],
         },
-        select: { userAId: true, userBId: true }
+        select: { userAId: true, userBId: true },
       });
 
       const matchedIds = new Set<string>();
@@ -126,23 +111,14 @@ router.get(
         if (m.userBId !== userId) matchedIds.add(m.userBId);
       }
 
-      /**
-       * =========================
-       * NEW: BLOCK LOOKUP
-       * =========================
-       */
-
       const blocks = await prisma.block.findMany({
         where: {
-          OR: [
-            { blockerId: userId },
-            { blockedId: userId }
-          ]
+          OR: [{ blockerId: userId }, { blockedId: userId }],
         },
         select: {
           blockerId: true,
-          blockedId: true
-        }
+          blockedId: true,
+        },
       });
 
       const blockedIds = new Set<string>();
@@ -152,31 +128,28 @@ router.get(
         if (b.blockedId === userId) blockedIds.add(b.blockerId);
       }
 
-      /**
-       * EXCLUDED USERS
-       */
-
       const excludedIds = [
         ...Array.from(swipedIds),
         ...Array.from(matchedIds),
-        ...Array.from(blockedIds) // ✅ ADDED
+        ...Array.from(blockedIds),
       ].slice(0, 500);
-
-      /**
-       * FETCH CANDIDATES
-       */
 
       const candidates = await prisma.user.findMany({
         where: {
           id: {
             not: userId,
-            notIn: excludedIds
+            notIn: excludedIds,
           },
           onboardingComplete: true,
           banned: false,
           photos: {
-            some: {}
-          }
+            some: {},
+          },
+
+          // ✅ NEW: verified filter (safe)
+          ...(onlyVerified && {
+            verified: true,
+          }),
         },
 
         select: {
@@ -193,16 +166,12 @@ router.get(
 
           photos: {
             select: { url: true },
-            orderBy: { order: "asc" }
-          }
+            orderBy: { order: "asc" },
+          },
         },
 
-        take: 300
+        take: 300,
       });
-
-      /**
-       * RANKING ALGORITHM
-       */
 
       const ranked = candidates
         .map((user) => {
@@ -249,7 +218,9 @@ router.get(
 
           score += user.eloScore * 0.05;
 
+          // ✅ MODIFIED: only apply distance if NOT anywhere
           if (
+            !anyLocation &&
             currentUser.latitude &&
             currentUser.longitude &&
             user.latitude &&
@@ -271,10 +242,6 @@ router.get(
         })
         .sort((a, b) => b.score - a.score);
 
-      /**
-       * CURSOR WINDOW
-       */
-
       const windowed = ranked.slice(cursor, cursor + BUFFER_SIZE);
 
       const profiles = windowed.slice(0, PAGE_SIZE).map((u) => ({
@@ -286,31 +253,26 @@ router.get(
         location: u.location,
         latitude: u.latitude,
         longitude: u.longitude,
-        photos: u.photos?.map((p) => p.url) ?? []
+        photos: u.photos?.map((p) => p.url) ?? [],
       }));
 
       const response = {
         profiles,
-        nextCursor: cursor + PAGE_SIZE
+        nextCursor: cursor + PAGE_SIZE,
       };
-
-      /**
-       * CACHE
-       */
 
       if (redis) {
         await redis.set(cacheKey, JSON.stringify(response), {
-          EX: DISCOVER_CACHE_TTL
+          EX: DISCOVER_CACHE_TTL,
         });
       }
 
       return res.json(response);
-
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
 
       return res.status(500).json({
-        message: "Failed to load discover feed"
+        message: "Failed to load discover feed",
       });
     }
   }

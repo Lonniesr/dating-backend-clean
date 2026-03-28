@@ -35,7 +35,6 @@ router.get(
   async (req: Request & { user?: any }, res: Response) => {
     try {
       const userId = req.user?.id;
-
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -69,10 +68,15 @@ router.get(
           ? (currentUser.preferences as any)
           : {};
 
-      // ✅ NEW: extract preferences safely
+      // ✅ FLAGS
       const onlyVerified = prefs.onlyVerified === true;
       const anyLocation = prefs.locationRadius === null;
+      const boostVerified = prefs.boostVerified === true;
+      const prioritizeLikedYou = prefs.prioritizeLikedYou === true;
 
+      /**
+       * SWIPES
+       */
       const swipeData = await prisma.swipe.findMany({
         where: {
           OR: [{ swiperId: userId }, { targetId: userId }],
@@ -97,6 +101,9 @@ router.get(
         }
       }
 
+      /**
+       * MATCHES
+       */
       const matches = await prisma.match.findMany({
         where: {
           OR: [{ userAId: userId }, { userBId: userId }],
@@ -111,6 +118,9 @@ router.get(
         if (m.userBId !== userId) matchedIds.add(m.userBId);
       }
 
+      /**
+       * BLOCKS
+       */
       const blocks = await prisma.block.findMany({
         where: {
           OR: [{ blockerId: userId }, { blockedId: userId }],
@@ -134,6 +144,9 @@ router.get(
         ...Array.from(blockedIds),
       ].slice(0, 500);
 
+      /**
+       * FETCH USERS
+       */
       const candidates = await prisma.user.findMany({
         where: {
           id: {
@@ -142,11 +155,8 @@ router.get(
           },
           onboardingComplete: true,
           banned: false,
-          photos: {
-            some: {},
-          },
+          photos: { some: {} },
 
-          // ✅ NEW: verified filter (safe)
           ...(onlyVerified && {
             verified: true,
           }),
@@ -163,6 +173,7 @@ router.get(
           longitude: true,
           lastActiveAt: true,
           eloScore: true,
+          verified: true,
 
           photos: {
             select: { url: true },
@@ -173,11 +184,22 @@ router.get(
         take: 300,
       });
 
+      /**
+       * RANKING
+       */
       const ranked = candidates
         .map((user) => {
           let score = 0;
 
-          if (likedYouSet.has(user.id)) score += 500;
+          // 🔥 PRIORITIZE "LIKED YOU"
+          if (likedYouSet.has(user.id)) {
+            score += prioritizeLikedYou ? 1000 : 500;
+          }
+
+          // 🔥 BOOST VERIFIED
+          if (boostVerified && user.verified) {
+            score += 80;
+          }
 
           if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
             if (
@@ -215,10 +237,8 @@ router.get(
           }
 
           score += (user.photos?.length || 0) * 10;
-
           score += user.eloScore * 0.05;
 
-          // ✅ MODIFIED: only apply distance if NOT anywhere
           if (
             !anyLocation &&
             currentUser.latitude &&
@@ -253,7 +273,7 @@ router.get(
         location: u.location,
         latitude: u.latitude,
         longitude: u.longitude,
-        photos: u.photos?.map((p) => p.url) ?? [],
+        photos: (u.photos ?? []).map((p: { url: string }) => p.url),
       }));
 
       const response = {
@@ -270,7 +290,6 @@ router.get(
       return res.json(response);
     } catch (err) {
       console.error("DISCOVER ERROR:", err);
-
       return res.status(500).json({
         message: "Failed to load discover feed",
       });

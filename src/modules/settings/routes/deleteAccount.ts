@@ -5,12 +5,31 @@ import { requireUser } from "../../../middleware/requireUser";
 const router = Router();
 
 router.delete("/", requireUser, async (req, res) => {
-  try {
-    const userId = req.user!.id;
+  const userId = req.user!.id;
 
-    await prisma.user.delete({
-      where: { id: userId },
-    });
+  try {
+    await prisma.$transaction([
+      // 1. Delete user's photos
+      prisma.photo.deleteMany({
+        where: { userId },
+      }),
+
+      // 2. Disconnect invites (VERY IMPORTANT)
+      prisma.invite.updateMany({
+        where: { invitedById: userId },
+        data: { invitedById: null },
+      }),
+
+      prisma.invite.updateMany({
+        where: { usedById: userId },
+        data: { usedById: null },
+      }),
+
+      // 3. Delete the user
+      prisma.user.delete({
+        where: { id: userId },
+      }),
+    ]);
 
     res.clearCookie("token");
 

@@ -2,15 +2,9 @@ import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import redis from "../../../redis";
 import { requireUser } from "../../../middleware/requireUser";
+import { calculateElo } from "../../../utils/elo"; // ✅ NEW
 
 const router = Router();
-
-/**
- * ELO adjustment values
- */
-
-const ELO_LIKE_GAIN = 10;
-const ELO_PASS_LOSS = 2;
 
 /**
  * POST /api/swipe
@@ -113,27 +107,50 @@ router.post(
       }
 
       /* ===============================
-         ELO RANKING UPDATE
+         ELO RANKING UPDATE (FIXED)
       =============================== */
 
-      if (isLiked) {
-        await prisma.user.update({
+      const [swiper, target] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: swiperId },
+          select: { eloScore: true, role: true },
+        }),
+        prisma.user.findUnique({
           where: { id: targetId },
-          data: {
-            eloScore: {
-              increment: ELO_LIKE_GAIN,
-            },
-          },
-        });
-      } else {
-        await prisma.user.update({
-          where: { id: targetId },
-          data: {
-            eloScore: {
-              decrement: ELO_PASS_LOSS,
-            },
-          },
-        });
+          select: { eloScore: true, role: true },
+        }),
+      ]);
+
+      // 🔐 prevent admin / invalid targets
+      if (!target || target.role !== "user") {
+        return res.status(400).json({ error: "Invalid target" });
+      }
+
+      if (swiper && target) {
+        const result = isLiked ? 1 : 0;
+
+        const newSwiperElo = calculateElo(
+          swiper.eloScore,
+          target.eloScore,
+          result
+        );
+
+        const newTargetElo = calculateElo(
+          target.eloScore,
+          swiper.eloScore,
+          isLiked ? 1 : 0
+        );
+
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id: swiperId },
+            data: { eloScore: newSwiperElo },
+          }),
+          prisma.user.update({
+            where: { id: targetId },
+            data: { eloScore: newTargetElo },
+          }),
+        ]);
       }
 
       /* ===============================
@@ -152,10 +169,6 @@ router.post(
         });
 
         if (reciprocal) {
-          /**
-           * Always sort IDs so match is unique
-           */
-
           const [userAId, userBId] =
             swiperId < targetId
               ? [swiperId, targetId]
@@ -175,10 +188,6 @@ router.post(
                 userBId,
               },
             });
-
-            /**
-             * NOTIFICATION EVENT
-             */
 
             await prisma.notification.create({
               data: {

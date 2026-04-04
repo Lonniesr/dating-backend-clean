@@ -68,15 +68,11 @@ router.get(
           ? (currentUser.preferences as any)
           : {};
 
-      // ✅ FLAGS
       const onlyVerified = prefs.onlyVerified === true;
       const anyLocation = prefs.locationRadius === null;
       const boostVerified = prefs.boostVerified === true;
       const prioritizeLikedYou = prefs.prioritizeLikedYou === true;
 
-      /**
-       * SWIPES
-       */
       const swipeData = await prisma.swipe.findMany({
         where: {
           OR: [{ swiperId: userId }, { targetId: userId }],
@@ -101,9 +97,6 @@ router.get(
         }
       }
 
-      /**
-       * MATCHES
-       */
       const matches = await prisma.match.findMany({
         where: {
           OR: [{ userAId: userId }, { userBId: userId }],
@@ -118,9 +111,6 @@ router.get(
         if (m.userBId !== userId) matchedIds.add(m.userBId);
       }
 
-      /**
-       * BLOCKS
-       */
       const blocks = await prisma.block.findMany({
         where: {
           OR: [{ blockerId: userId }, { blockedId: userId }],
@@ -144,15 +134,13 @@ router.get(
         ...Array.from(blockedIds),
       ].slice(0, 500);
 
-      /**
-       * FETCH USERS
-       */
       const candidates = await prisma.user.findMany({
         where: {
           id: {
             not: userId,
             notIn: excludedIds,
           },
+          role: "user", // 🔥 FIX: exclude admins
           onboardingComplete: true,
           banned: false,
           photos: { some: {} },
@@ -184,19 +172,14 @@ router.get(
         take: 300,
       });
 
-      /**
-       * RANKING
-       */
       const ranked = candidates
         .map((user) => {
           let score = 0;
 
-          // 🔥 PRIORITIZE "LIKED YOU"
           if (likedYouSet.has(user.id)) {
             score += prioritizeLikedYou ? 1000 : 500;
           }
 
-          // 🔥 BOOST VERIFIED
           if (boostVerified && user.verified) {
             score += 80;
           }

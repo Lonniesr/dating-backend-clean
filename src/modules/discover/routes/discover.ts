@@ -140,13 +140,22 @@ router.get(
             not: userId,
             notIn: excludedIds,
           },
-          role: "user", // 🔥 FIX: exclude admins
+          role: "user",
           onboardingComplete: true,
           banned: false,
           photos: { some: {} },
 
           ...(onlyVerified && {
             verified: true,
+          }),
+
+          // ✅ 🔥 STRICT GENDER FILTER (ONLY CHANGE)
+          ...(prefs.interestedIn === "Men" && {
+            gender: { equals: "male", mode: "insensitive" },
+          }),
+
+          ...(prefs.interestedIn === "Women" && {
+            gender: { equals: "female", mode: "insensitive" },
           }),
         },
 

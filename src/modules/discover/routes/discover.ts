@@ -40,14 +40,6 @@ router.get(
       }
 
       const cursor = Number(req.query.cursor || 0);
-      const cacheKey = `discover:${userId}:${cursor}`;
-
-      if (redis) {
-        const cached = await redis.get(cacheKey);
-        if (cached) {
-          return res.json(JSON.parse(cached));
-        }
-      }
 
       const currentUser = await prisma.user.findUnique({
         where: { id: userId },
@@ -67,6 +59,19 @@ router.get(
         typeof currentUser.preferences === "object"
           ? (currentUser.preferences as any)
           : {};
+
+      // ✅ normalize preference (FIX)
+      const interested = (prefs.interestedIn || "").toLowerCase();
+
+      // ✅ FIX: cache key now includes preference
+      const cacheKey = `discover:${userId}:${cursor}:${interested}`;
+
+      if (redis) {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          return res.json(JSON.parse(cached));
+        }
+      }
 
       const onlyVerified = prefs.onlyVerified === true;
       const anyLocation = prefs.locationRadius === null;
@@ -149,13 +154,17 @@ router.get(
             verified: true,
           }),
 
-          // ✅ 🔥 STRICT GENDER FILTER (ONLY CHANGE)
-          ...(prefs.interestedIn === "Men" && {
-            gender: { equals: "male", mode: "insensitive" },
+          // ✅ FIXED FILTER (robust)
+          ...(interested === "men" && {
+            gender: {
+              in: ["male", "Male", "man", "Man"],
+            },
           }),
 
-          ...(prefs.interestedIn === "Women" && {
-            gender: { equals: "female", mode: "insensitive" },
+          ...(interested === "women" && {
+            gender: {
+              in: ["female", "Female", "woman", "Woman"],
+            },
           }),
         },
 
@@ -195,8 +204,8 @@ router.get(
 
           if (prefs.interestedIn && prefs.interestedIn !== "Everyone") {
             if (
-              (prefs.interestedIn === "Men" && user.gender === "male") ||
-              (prefs.interestedIn === "Women" && user.gender === "female")
+              (interested === "men" && user.gender === "male") ||
+              (interested === "women" && user.gender === "female")
             ) {
               score += 50;
             } else {

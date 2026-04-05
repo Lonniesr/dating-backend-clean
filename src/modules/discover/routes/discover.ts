@@ -177,7 +177,7 @@ router.get(
           lastActiveAt: true,
           eloScore: true,
           verified: true,
-          preferences: true, // ✅ REQUIRED FOR MUTUAL MATCHING
+          preferences: true,
 
           photos: {
             select: { url: true },
@@ -285,7 +285,18 @@ router.get(
         })
         .sort((a, b) => b.score - a.score);
 
-      const windowed = ranked.slice(cursor, cursor + BUFFER_SIZE);
+      // ⭐ TOP PICKS INJECTION
+      const topPicks = [...ranked]
+        .sort((a, b) => (b.eloScore || 0) - (a.eloScore || 0))
+        .slice(0, 3);
+
+      const remaining = ranked.filter(
+        (u) => !topPicks.some((tp) => tp.id === u.id)
+      );
+
+      const finalFeed = [...topPicks, ...remaining];
+
+      const windowed = finalFeed.slice(cursor, cursor + BUFFER_SIZE);
 
       const profiles = windowed.slice(0, PAGE_SIZE).map((u) => ({
         id: u.id,

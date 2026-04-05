@@ -60,10 +60,8 @@ router.get(
           ? (currentUser.preferences as any)
           : {};
 
-      // ✅ normalize preference (FIX)
       const interested = (prefs.interestedIn || "").toLowerCase();
 
-      // ✅ FIX: cache key now includes preference
       const cacheKey = `discover:${userId}:${cursor}:${interested}`;
 
       if (redis) {
@@ -154,7 +152,6 @@ router.get(
             verified: true,
           }),
 
-          // ✅ FIXED FILTER (robust)
           ...(interested === "men" && {
             gender: {
               in: ["male", "Male", "man", "Man"],
@@ -180,6 +177,7 @@ router.get(
           lastActiveAt: true,
           eloScore: true,
           verified: true,
+          preferences: true, // ✅ REQUIRED FOR MUTUAL MATCHING
 
           photos: {
             select: { url: true },
@@ -191,6 +189,30 @@ router.get(
       });
 
       const ranked = candidates
+        .filter((user) => {
+          const theirPrefs =
+            user.preferences && typeof user.preferences === "object"
+              ? (user.preferences as any)
+              : {};
+
+          const theirInterested = (theirPrefs.interestedIn || "").toLowerCase();
+
+          if (interested === "women") {
+            return (
+              user.gender?.toLowerCase() === "female" &&
+              (theirInterested === "men" || theirInterested === "everyone")
+            );
+          }
+
+          if (interested === "men") {
+            return (
+              user.gender?.toLowerCase() === "male" &&
+              (theirInterested === "women" || theirInterested === "everyone")
+            );
+          }
+
+          return true;
+        })
         .map((user) => {
           let score = 0;
 

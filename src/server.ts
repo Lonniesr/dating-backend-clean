@@ -50,6 +50,13 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
+   STATIC FILES (🔥 FIX ADDED)
+========================= */
+
+// ✅ THIS IS THE FIX — allows images to load
+app.use("/uploads", express.static("uploads"));
+
+/* =========================
    CORS (FIXED FOR VERCEL)
 ========================= */
 

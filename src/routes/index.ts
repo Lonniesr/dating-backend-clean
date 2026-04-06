@@ -13,7 +13,6 @@ import discoverRoutes from "../modules/discover/routes";
 import swipeRoutes from "../modules/swipe/routes";
 import userRoutes from "../modules/user/routes";
 import profileRoutes from "../modules/user/routes/profile";
-import chatUploadRoute from "../modules/upload/routes/chatUploadRoute";
 import publicInviteRoutes from "../modules/user/routes/public/invite";
 import inviteRoutes from "../modules/invite/routes";
 
@@ -65,6 +64,12 @@ import adminSearchRoutes from "../modules/admin/routes/admin.search";
 import blockRoutes from "../modules/user/routes/block";
 import reportRoutes from "../modules/user/routes/report";
 
+/* =========================
+   🔥 UPLOAD ROUTES (FIX ADDED)
+========================= */
+
+import chatUploadRoutes from "../modules/upload/routes/chatUpload";
+
 const router = Router();
 
 /* =========================
@@ -112,8 +117,6 @@ router.use("/user/selfie-verification", selfieVerificationRoutes);
 router.use("/invite", inviteRoutes);
 router.use("/invite", publicInviteRoutes);
 
-router.use("/upload/chat", chatUploadRoute);
-
 /* =========================
    MATCHING DOMAIN
 ========================= */
@@ -128,6 +131,12 @@ router.use("/swipe", swipeRoutes);
 
 router.use("/conversations", conversationsRoutes);
 router.use("/messages", messageRoutes);
+
+/* =========================
+   🔥 UPLOAD DOMAIN (THIS WAS MISSING)
+========================= */
+
+router.use("/upload", chatUploadRoutes);
 
 /* =========================
    SETTINGS DOMAIN
@@ -149,7 +158,7 @@ router.use("/admin/swipe", adminSwipeRoutes);
 router.use("/admin/matches", adminMatchesRoutes);
 router.use("/admin/verification", adminVerificationRoutes);
 
-/* 🔥 NEW: ADMIN SEARCH (THIS IS THE IMPORTANT LINE) */
+/* 🔥 NEW: ADMIN SEARCH */
 router.use("/admin/search", adminSearchRoutes);
 
 router.use("/admin/messages", adminMessagesRoutes);

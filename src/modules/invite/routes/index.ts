@@ -1,13 +1,11 @@
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
-import { nanoid } from "nanoid";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
 /**
  * GET /api/invite
- * Test route
  */
 router.get("/", (req: Request, res: Response) => {
   res.json({ message: "Invite route working" });
@@ -15,7 +13,6 @@ router.get("/", (req: Request, res: Response) => {
 
 /**
  * GET /api/invite/stats
- * Invite statistics for logged in user
  */
 router.get("/stats", requireUser, async (req: any, res: Response) => {
   try {
@@ -45,11 +42,9 @@ router.get("/stats", requireUser, async (req: any, res: Response) => {
 
 /**
  * GET /api/invite/leaderboard
- * Top inviters
  */
 router.get("/leaderboard", async (_req: Request, res: Response) => {
   try {
-
     const leaderboard = await prisma.invite.groupBy({
       by: ["invitedById"],
       _count: {
@@ -98,7 +93,6 @@ router.get("/leaderboard", async (_req: Request, res: Response) => {
 
 /**
  * POST /api/invite
- * Generate invite
  */
 router.post("/", requireUser, async (req: any, res: Response) => {
   try {
@@ -109,11 +103,12 @@ router.post("/", requireUser, async (req: any, res: Response) => {
     const expiresInDays =
       typeof body.expiresInDays === "number" ? body.expiresInDays : null;
 
+    /* ✅ FIX (ONLY CHANGE THAT MATTERS) */
+    const { nanoid } = await import("nanoid");
     const code = nanoid(8);
 
     let expiresAt: Date | null = null;
 
-    // 🔥 DEFAULT: 3 months for premium invites
     if (premium) {
       expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90);
     } else if (expiresInDays) {
@@ -128,8 +123,6 @@ router.post("/", requireUser, async (req: any, res: Response) => {
         invitedById: userId,
         expiresAt,
         used: false,
-
-        // 🔥 NEW (safe additions)
         maxUses: premium ? null : 1,
         usedCount: 0,
       },

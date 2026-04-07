@@ -149,27 +149,36 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     /* =========================
-       🔥 REALTIME SOCKET EMIT
+       🔥 REALTIME SOCKET EMIT (FIXED)
     ========================= */
 
     try {
       const io = req.app.get("io");
 
-      if (io) {
+      if (!io) {
+        console.error("❌ IO NOT FOUND — socket not attached to app");
+      } else {
+        // send to receiver
         io.to(receiverId).emit("message:new", {
           conversationId: conversation.id,
         });
 
-        console.log("🔥 Socket message emitted to:", receiverId);
-      } else {
-        console.log("⚠️ IO NOT FOUND");
+        // 🔥 ALSO send back to sender (fixes UI sync issues)
+        io.to(senderId).emit("message:new", {
+          conversationId: conversation.id,
+        });
+
+        console.log("🔥 Socket message emitted:", {
+          senderId,
+          receiverId,
+        });
       }
     } catch (err) {
       console.error("❌ Socket emit error:", err);
     }
 
     /* =========================
-       🔥 PUSH NOTIFICATION
+       🔥 PUSH NOTIFICATION (HARDENED)
     ========================= */
 
     try {

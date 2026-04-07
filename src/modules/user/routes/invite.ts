@@ -1,58 +1,52 @@
-console.log("THIS IS THE REAL INVITE ROUTE FILE");
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
-import { nanoid } from "nanoid";
 import { requireUser } from "../../../middleware/requireUser";
 
 const router = Router();
 
+/* ✅ nanoid helper */
+const generateNanoId = async (length: number) => {
+  const { nanoid } = await import("nanoid");
+  return nanoid(length);
+};
+
 /**
- * POST /api/invite
- * Generate invite
+ * POST /api/user/invites
  */
-router.post("/", requireUser, async (req: any, res: Response) => {
+router.post("/", requireUser, async (req: Request, res: Response) => {
   try {
-    const userId = req.user.id;
+    /* ✅ SAFE CAST (after middleware) */
+    const user = (req as any).user;
 
-    const body = req.body || {};
-    const premium = Boolean(body.premium);
-    const expiresInDays =
-      typeof body.expiresInDays === "number" ? body.expiresInDays : null;
-
-    const code = nanoid(8);
-
-    let expiresAt: Date | null = null;
-    if (expiresInDays) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const userId = user.id;
+
+    const code = await generateNanoId(10);
 
     const invite = await prisma.invite.create({
       data: {
         code,
-        premium,
         invitedById: userId,
-        expiresAt,
         used: false,
       },
     });
 
-    const frontendUrl = process.env.FRONTEND_URL;
-    if (!frontendUrl) {
-      throw new Error("FRONTEND_URL not defined");
-    }
-
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     const inviteLink = `${frontendUrl}/invite/${invite.code}`;
 
     return res.json({
+      id: invite.id,
       code: invite.code,
-      inviteLink, // ✅ THIS is what you were missing
-      premium: invite.premium,
-      expiresAt: invite.expiresAt,
+      inviteLink,
     });
 
-  } catch (err) {
-    console.error("INVITE CREATE ERROR:", err);
-    return res.status(500).json({ error: "Server error" });
+  } catch (error) {
+    console.error("Create user invite error:", error);
+    return res.status(500).json({ error: "Failed to create invite" });
   }
 });
+
+export default router;

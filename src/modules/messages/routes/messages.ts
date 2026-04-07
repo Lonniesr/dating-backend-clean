@@ -1,7 +1,7 @@
 import { Router } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
-import { sendPushNotification } from "../../../services/push"; // 🔥 NEW
+import { sendPushNotification } from "../../../services/push";
 
 const router = Router();
 
@@ -73,6 +73,8 @@ router.get("/:id", requireUser, async (req: any, res) => {
  */
 router.post("/:id", requireUser, async (req: any, res) => {
   try {
+    console.log("🔥 MESSAGE ROUTE HIT");
+
     const senderId = req.user.id;
     const id = req.params.id;
 
@@ -136,6 +138,8 @@ router.post("/:id", requireUser, async (req: any, res) => {
       },
     });
 
+    console.log("🔥 MESSAGE CREATED:", message.id);
+
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: {
@@ -145,7 +149,27 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     /* =========================
-       🔥 SEND PUSH NOTIFICATION
+       🔥 REALTIME SOCKET EMIT
+    ========================= */
+
+    try {
+      const io = req.app.get("io");
+
+      if (io) {
+        io.to(receiverId).emit("message:new", {
+          conversationId: conversation.id,
+        });
+
+        console.log("🔥 Socket message emitted to:", receiverId);
+      } else {
+        console.log("⚠️ IO NOT FOUND");
+      }
+    } catch (err) {
+      console.error("❌ Socket emit error:", err);
+    }
+
+    /* =========================
+       🔥 PUSH NOTIFICATION
     ========================= */
 
     try {
@@ -153,6 +177,8 @@ router.post("/:id", requireUser, async (req: any, res) => {
         where: { id: receiverId },
         select: { pushToken: true },
       });
+
+      console.log("👀 Receiver push token:", receiver?.pushToken);
 
       if (receiver?.pushToken) {
         await sendPushNotification({

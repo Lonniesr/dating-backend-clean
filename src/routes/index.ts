@@ -18,7 +18,7 @@ router.post("/", requireUser, async (req: any, res: Response) => {
     const expiresInDays =
       typeof body.expiresInDays === "number" ? body.expiresInDays : null;
 
-    /* ✅ nanoid fix */
+    /* ✅ ONLY VALID nanoid usage */
     const { nanoid } = await import("nanoid");
     const code = nanoid(8);
 

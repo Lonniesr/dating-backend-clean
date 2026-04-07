@@ -1,6 +1,7 @@
 import { Router } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
+import { sendPushNotification } from "../../../services/push"; // 🔥 NEW
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.get("/:id", requireUser, async (req: any, res) => {
 });
 
 /**
- * POST message (FIXED — NO MULTER HERE)
+ * POST message
  */
 router.post("/:id", requireUser, async (req: any, res) => {
   try {
@@ -143,7 +144,35 @@ router.post("/:id", requireUser, async (req: any, res) => {
       },
     });
 
+    /* =========================
+       🔥 SEND PUSH NOTIFICATION
+    ========================= */
+
+    try {
+      const receiver = await prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { pushToken: true },
+      });
+
+      if (receiver?.pushToken) {
+        await sendPushNotification({
+          token: receiver.pushToken,
+          title: "New message 💬",
+          body: text || "Sent you a photo",
+        });
+
+        console.log("🔥 Push sent to user:", receiverId);
+      } else {
+        console.log("⚠️ No push token for user:", receiverId);
+      }
+    } catch (pushErr) {
+      console.error("❌ Push send error:", pushErr);
+    }
+
+    /* ========================= */
+
     res.json(message);
+
   } catch (err) {
     console.error("SEND MESSAGE ERROR:", err);
     res.status(500).json({ message: "Failed to send message." });

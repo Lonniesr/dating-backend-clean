@@ -55,6 +55,9 @@ model User {
 
   eloScore           Int      @default(1000)
 
+  // 🔥 NEW FIELD (PUSH NOTIFICATIONS)
+  pushToken          String?
+
   Admin              Admin?
 
   conversationsA     Conversation[] @relation("UserAConversations")

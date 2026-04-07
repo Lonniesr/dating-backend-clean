@@ -42,6 +42,37 @@ router.get("/check-username", async (req: Request, res: Response) => {
 });
 
 /**
+ * 🔥 SAVE PUSH TOKEN (NEW)
+ */
+router.post("/push-token", requireUser, async (req: any, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        error: "No token provided",
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { pushToken: token },
+    });
+
+    console.log("🔥 Saved push token:", token);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Push token save error:", err);
+
+    res.status(500).json({
+      error: "Failed to save push token",
+    });
+  }
+});
+
+/**
  * PROFILE (ONLY ONE ROUTE)
  */
 router.put("/profile", requireUser, updateProfile);

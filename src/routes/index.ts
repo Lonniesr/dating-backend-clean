@@ -7,7 +7,10 @@ import { Router } from "express";
 import authRoutes from "../modules/auth/routes";
 import onboardingRoutes from "../modules/onboarding/routes";
 import matchRoutes from "../modules/match/routes";
-import messageRoutes from "../modules/messages/routes";
+
+/* 🔥 FIXED IMPORT */
+import messageRoutes from "../modules/messages/routes/messages";
+
 import conversationsRoutes from "../modules/messages/routes/conversations";
 import discoverRoutes from "../modules/discover/routes";
 import swipeRoutes from "../modules/swipe/routes";

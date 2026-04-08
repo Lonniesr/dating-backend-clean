@@ -158,19 +158,20 @@ router.post("/:id", requireUser, async (req: any, res) => {
       if (!io) {
         console.error("❌ IO NOT FOUND — socket not attached to app");
       } else {
-        // send to receiver
-        io.to(receiverId).emit("message:new", {
+        // ✅ FIXED: use correct room names
+        io.to(`user:${receiverId}`).emit("message:new", {
           conversationId: conversation.id,
         });
 
-        // 🔥 ALSO send back to sender (fixes UI sync issues)
-        io.to(senderId).emit("message:new", {
+        io.to(`user:${senderId}`).emit("message:new", {
           conversationId: conversation.id,
         });
 
         console.log("🔥 Socket message emitted:", {
           senderId,
           receiverId,
+          roomReceiver: `user:${receiverId}`,
+          roomSender: `user:${senderId}`,
         });
       }
     } catch (err) {
@@ -178,7 +179,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
     }
 
     /* =========================
-       🔥 PUSH NOTIFICATION (HARDENED)
+       🔥 PUSH NOTIFICATION
     ========================= */
 
     try {
@@ -203,8 +204,6 @@ router.post("/:id", requireUser, async (req: any, res) => {
     } catch (pushErr) {
       console.error("❌ Push send error:", pushErr);
     }
-
-    /* ========================= */
 
     res.json(message);
 

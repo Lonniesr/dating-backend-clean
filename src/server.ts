@@ -17,7 +17,23 @@ import { updateLastActive } from "./middleware/updateLastActive";
 const app = express();
 const server = http.createServer(app);
 
+/* =========================
+   🔥 PUBLIC FILES (CRITICAL FIX)
+========================= */
+
+app.use(
+  "/uploads",
+  express.static("uploads", {
+    fallthrough: false, // 🚨 prevents middleware from running after
+    maxAge: "7d",
+  })
+);
+
 app.set("trust proxy", 1);
+
+/* =========================
+   SECURITY + MIDDLEWARE
+========================= */
 
 app.use(
   helmet({
@@ -34,14 +50,16 @@ app.use(cookieParser());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/uploads", express.static("uploads"));
-
 app.use(
   cors({
     origin: true,
     credentials: true,
   })
 );
+
+/* =========================
+   APP LOGIC
+========================= */
 
 app.use(updateLastActive);
 
@@ -63,7 +81,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 /* =========================
-   SOCKET.IO (FIXED)
+   SOCKET.IO
 ========================= */
 
 export const io = new SocketIOServer(server, {
@@ -73,7 +91,7 @@ export const io = new SocketIOServer(server, {
   },
 });
 
-/* 🔥 THIS WAS MISSING */
+/* 🔥 REQUIRED FOR SOCKET ACCESS IN ROUTES */
 app.set("io", io);
 
 io.on("connection", (socket) => {

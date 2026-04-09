@@ -93,8 +93,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
 
     if (!sender.verified && isMedia) {
       return res.status(403).json({
-        message:
-          "Verify your profile to send photos and voice messages.",
+        message: "Verify your profile to send photos and voice messages.",
       });
     }
 
@@ -126,19 +125,23 @@ router.post("/:id", requireUser, async (req: any, res) => {
       });
     }
 
+    /* =========================
+       🔥 CREATE MESSAGE (FIXED)
+    ========================= */
+
     const message = await prisma.message.create({
       data: {
         senderId,
         receiverId,
         text: text || null,
-        imageUrl: imageUrl || null,
-        audioUrl,
-        replyToId,
+        imageUrl: imageUrl || null, // ✅ GUARANTEED
+        audioUrl: audioUrl || null,
+        replyToId: replyToId || null,
         conversationId: conversation.id,
       },
     });
 
-    console.log("🔥 MESSAGE CREATED:", message.id);
+    console.log("🔥 MESSAGE CREATED:", message);
 
     await prisma.conversation.update({
       where: { id: conversation.id },
@@ -149,30 +152,17 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     /* =========================
-       🔥 REALTIME SOCKET EMIT (FIXED)
+       🔥 REALTIME SOCKET (FIXED)
     ========================= */
 
     try {
       const io = req.app.get("io");
 
-      if (!io) {
-        console.error("❌ IO NOT FOUND — socket not attached to app");
-      } else {
-        // ✅ FIXED: use correct room names
-        io.to(`user:${receiverId}`).emit("message:new", {
-          conversationId: conversation.id,
-        });
+      if (io) {
+        io.to(`user:${receiverId}`).emit("message:new", message); // ✅ FULL MESSAGE
+        io.to(`user:${senderId}`).emit("message:new", message);   // ✅ FULL MESSAGE
 
-        io.to(`user:${senderId}`).emit("message:new", {
-          conversationId: conversation.id,
-        });
-
-        console.log("🔥 Socket message emitted:", {
-          senderId,
-          receiverId,
-          roomReceiver: `user:${receiverId}`,
-          roomSender: `user:${senderId}`,
-        });
+        console.log("🔥 Socket message emitted (FULL):", message.id);
       }
     } catch (err) {
       console.error("❌ Socket emit error:", err);
@@ -188,8 +178,6 @@ router.post("/:id", requireUser, async (req: any, res) => {
         select: { pushToken: true },
       });
 
-      console.log("👀 Receiver push token:", receiver?.pushToken);
-
       if (receiver?.pushToken) {
         await sendPushNotification({
           token: receiver.pushToken,
@@ -198,14 +186,16 @@ router.post("/:id", requireUser, async (req: any, res) => {
         });
 
         console.log("🔥 Push sent to user:", receiverId);
-      } else {
-        console.log("⚠️ No push token for user:", receiverId);
       }
     } catch (pushErr) {
       console.error("❌ Push send error:", pushErr);
     }
 
-    res.json(message);
+    /* =========================
+       🔥 RESPONSE (FINAL FIX)
+    ========================= */
+
+    return res.json(message); // ✅ MUST RETURN FULL MESSAGE
 
   } catch (err) {
     console.error("SEND MESSAGE ERROR:", err);

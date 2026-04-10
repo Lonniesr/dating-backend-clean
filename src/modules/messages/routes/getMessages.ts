@@ -14,6 +14,53 @@ export default async function getMessages(
     }
 
     /* =========================
+       GET CONVERSATION
+    ========================= */
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    /* =========================
+       SECURITY CHECK
+    ========================= */
+
+    if (
+      conversation.userAId !== userId &&
+      conversation.userBId !== userId
+    ) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    /* =========================
+       GET OTHER USER
+    ========================= */
+
+    const otherUserId =
+      conversation.userAId === userId
+        ? conversation.userBId
+        : conversation.userAId;
+
+    /* =========================
+       CHECK BLOCK STATUS
+    ========================= */
+
+    const block = await prisma.block.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: otherUserId },
+          { blockerId: otherUserId, blockedId: userId },
+        ],
+      },
+    });
+
+    const isBlocked = !!block;
+
+    /* =========================
        MARK MESSAGES AS READ
     ========================= */
 
@@ -21,12 +68,16 @@ export default async function getMessages(
       where: {
         conversationId,
         receiverId: userId,
-        read: false
+        read: false,
       },
       data: {
-        read: true
-      }
+        read: true,
+      },
     });
+
+    /* =========================
+       GET MESSAGES
+    ========================= */
 
     const messages = await prisma.message.findMany({
       where: {
@@ -47,7 +98,14 @@ export default async function getMessages(
       },
     });
 
-    return res.json(messages);
+    /* =========================
+       RETURN RESPONSE
+    ========================= */
+
+    return res.json({
+      messages,
+      isBlocked,
+    });
 
   } catch (err) {
     console.error("GET MESSAGES ERROR:", err);

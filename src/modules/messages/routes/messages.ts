@@ -46,6 +46,26 @@ router.get("/:id", requireUser, async (req: any, res) => {
 
     const conversation = await resolveConversation(userId, id);
 
+    const receiverId =
+      conversation.userAId === userId
+        ? conversation.userBId
+        : conversation.userAId;
+
+    /* =========================
+       CHECK BLOCK STATUS
+    ========================= */
+
+    const block = await prisma.block.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: receiverId },
+          { blockerId: receiverId, blockedId: userId },
+        ],
+      },
+    });
+
+    const isBlocked = !!block;
+
     const messages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: "desc" },
@@ -61,7 +81,11 @@ router.get("/:id", requireUser, async (req: any, res) => {
       data: { read: true },
     });
 
-    res.json(messages.reverse());
+    return res.json({
+      messages: messages.reverse(),
+      isBlocked,
+    });
+
   } catch (err) {
     console.error("CHAT FETCH ERROR:", err);
     res.status(500).json({ message: "Failed to load chat." });
@@ -110,6 +134,10 @@ router.post("/:id", requireUser, async (req: any, res) => {
         ? conversation.userBId
         : conversation.userAId;
 
+    /* =========================
+       CHECK BLOCK STATUS
+    ========================= */
+
     const blocked = await prisma.block.findFirst({
       where: {
         OR: [
@@ -126,7 +154,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
     }
 
     /* =========================
-       🔥 CREATE MESSAGE (FIXED)
+       CREATE MESSAGE
     ========================= */
 
     const message = await prisma.message.create({
@@ -134,7 +162,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
         senderId,
         receiverId,
         text: text || null,
-        imageUrl: imageUrl || null, // ✅ GUARANTEED
+        imageUrl: imageUrl || null,
         audioUrl: audioUrl || null,
         replyToId: replyToId || null,
         conversationId: conversation.id,
@@ -152,24 +180,24 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     /* =========================
-       🔥 REALTIME SOCKET (FIXED)
+       REALTIME SOCKET
     ========================= */
 
     try {
       const io = req.app.get("io");
 
       if (io) {
-        io.to(`user:${receiverId}`).emit("message:new", message); // ✅ FULL MESSAGE
-        io.to(`user:${senderId}`).emit("message:new", message);   // ✅ FULL MESSAGE
+        io.to(`user:${receiverId}`).emit("message:new", message);
+        io.to(`user:${senderId}`).emit("message:new", message);
 
-        console.log("🔥 Socket message emitted (FULL):", message.id);
+        console.log("🔥 Socket message emitted:", message.id);
       }
     } catch (err) {
       console.error("❌ Socket emit error:", err);
     }
 
     /* =========================
-       🔥 PUSH NOTIFICATION
+       PUSH NOTIFICATION
     ========================= */
 
     try {
@@ -178,7 +206,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
         select: { pushToken: true },
       });
 
-      if (receiver?.pushToken) {
+      if (receiver?.pushToken && !blocked) {
         await sendPushNotification({
           token: receiver.pushToken,
           title: "New message 💬",
@@ -191,11 +219,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
       console.error("❌ Push send error:", pushErr);
     }
 
-    /* =========================
-       🔥 RESPONSE (FINAL FIX)
-    ========================= */
-
-    return res.json(message); // ✅ MUST RETURN FULL MESSAGE
+    return res.json(message);
 
   } catch (err) {
     console.error("SEND MESSAGE ERROR:", err);

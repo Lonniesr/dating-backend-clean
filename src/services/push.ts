@@ -1,5 +1,9 @@
 import admin from "firebase-admin";
 
+/* =========================
+   INIT FIREBASE ADMIN
+========================= */
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(
@@ -8,40 +12,33 @@ if (!admin.apps.length) {
   });
 }
 
+/* =========================
+   SEND PUSH (UPDATED)
+========================= */
+
 export async function sendPushNotification({
   token,
   title,
   body,
+  data, // 🔥 NEW
 }: {
   token: string;
   title: string;
   body: string;
+  data?: Record<string, string>; // 🔥 NEW
 }) {
   try {
-    const res = await admin.messaging().send({
+    await admin.messaging().send({
       token,
       notification: {
         title,
         body,
       },
-      webpush: {
-        notification: {
-          icon: "/icon.png",
-          badge: "/badge.png",
-        },
-      },
+      data, // 🔥 THIS ENABLES DEEP LINKING
     });
 
-    console.log("🔥 Push success:", res);
-  } catch (err: any) {
-    console.error("❌ Push error FULL:", err);
-
-    // 🔥 AUTO CLEAN INVALID TOKENS
-    if (
-      err.code === "messaging/registration-token-not-registered" ||
-      err.code === "messaging/invalid-registration-token"
-    ) {
-      console.log("⚠️ Invalid token, should remove from DB");
-    }
+    console.log("🔥 Push sent");
+  } catch (err) {
+    console.error("❌ Push error:", err);
   }
 }

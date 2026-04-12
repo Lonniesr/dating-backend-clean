@@ -189,7 +189,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
     }
 
     /* =========================
-       PUSH NOTIFICATION
+       PUSH NOTIFICATION (UPDATED)
     ========================= */
 
     try {
@@ -211,6 +211,9 @@ router.post("/:id", requireUser, async (req: any, res) => {
           token: receiver.pushToken,
           title: `${sender.name || "Someone"} sent you a message 💬`,
           body: messageBody,
+          data: {
+            url: `/chat/${senderId}`, // 🔥 opens correct chat
+          },
         });
 
         console.log("🔥 Push sent to user:", receiverId);

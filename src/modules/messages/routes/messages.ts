@@ -51,10 +51,6 @@ router.get("/:id", requireUser, async (req: any, res) => {
         ? conversation.userBId
         : conversation.userAId;
 
-    /* =========================
-       CHECK BLOCK STATUS
-    ========================= */
-
     const block = await prisma.block.findFirst({
       where: {
         OR: [
@@ -106,7 +102,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
 
     const sender = await prisma.user.findUnique({
       where: { id: senderId },
-      select: { verified: true },
+      select: { verified: true, name: true },
     });
 
     if (!sender) {
@@ -133,10 +129,6 @@ router.post("/:id", requireUser, async (req: any, res) => {
       conversation.userAId === senderId
         ? conversation.userBId
         : conversation.userAId;
-
-    /* =========================
-       CHECK BLOCK STATUS
-    ========================= */
 
     const blocked = await prisma.block.findFirst({
       where: {
@@ -206,14 +198,24 @@ router.post("/:id", requireUser, async (req: any, res) => {
         select: { pushToken: true },
       });
 
+      console.log("📲 Receiver push token:", receiver?.pushToken);
+
       if (receiver?.pushToken && !blocked) {
+        const messageBody =
+          text ||
+          (imageUrl && "📸 Sent you a photo") ||
+          (audioUrl && "🎤 Sent you a voice message") ||
+          "New message";
+
         await sendPushNotification({
           token: receiver.pushToken,
-          title: "New message 💬",
-          body: text || "Sent you a photo",
+          title: `${sender.name || "Someone"} sent you a message 💬`,
+          body: messageBody,
         });
 
         console.log("🔥 Push sent to user:", receiverId);
+      } else {
+        console.log("⚠️ No push token found or user blocked");
       }
     } catch (pushErr) {
       console.error("❌ Push send error:", pushErr);

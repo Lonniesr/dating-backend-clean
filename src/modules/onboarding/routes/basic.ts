@@ -19,7 +19,7 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
       gender,
       race,
       bio,
-      birthplace,
+      location,      // ✅ NEW (replaces birthplace)
       latitude,
       longitude,
     } = req.body;
@@ -37,6 +37,25 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
     if (!finalName || !birthdate || !gender || !race) {
       return res.status(400).json({
         error: "Name, birthdate, gender, and race are required.",
+      });
+    }
+
+    // ✅ LOCATION REQUIRED
+    if (!location || !location.trim()) {
+      return res.status(400).json({
+        error: "Location is required.",
+      });
+    }
+
+    // ✅ COORDINATES REQUIRED
+    if (
+      latitude === undefined ||
+      longitude === undefined ||
+      latitude === null ||
+      longitude === null
+    ) {
+      return res.status(400).json({
+        error: "Valid location coordinates required.",
       });
     }
 
@@ -88,14 +107,12 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
         age,
         gender,
         race,
+        location: location.trim(), // ✅ SAVED PROPERLY
+
         ...(bio !== undefined && { bio: bio?.trim() || null }),
-        ...(birthplace !== undefined && { birthplace: birthplace?.trim() || null }),
-        ...(latitude !== undefined && {
-          latitude: latitude !== null ? Number(latitude) : null,
-        }),
-        ...(longitude !== undefined && {
-          longitude: longitude !== null ? Number(longitude) : null,
-        }),
+
+        latitude: Number(latitude),
+        longitude: Number(longitude),
       },
       select: {
         id: true,
@@ -105,7 +122,7 @@ router.post("/", requireUser, async (req: Request & { user?: any }, res: Respons
         gender: true,
         race: true,
         bio: true,
-        birthplace: true,
+        location: true,   // ✅ RETURNED
         latitude: true,
         longitude: true,
       },

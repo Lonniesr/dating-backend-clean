@@ -29,7 +29,7 @@ model User {
 
   bio                String?
   birthplace         String?
-  location           String?
+  location           String   @default("Nearby") // ✅ FIXED
 
   latitude           Float?
   longitude          Float?
@@ -55,7 +55,6 @@ model User {
 
   eloScore           Int      @default(1000)
 
-  // 🔥 NEW FIELD (PUSH NOTIFICATIONS)
   pushToken          String?
 
   Admin              Admin?

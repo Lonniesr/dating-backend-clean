@@ -109,7 +109,11 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
+          // ORIGINAL (unchanged)
           io.to(room).emit("message:new", message);
+
+          // 🔥 FIX — guaranteed delivery
+          io.to(`user:${receiverId}`).emit("message:new", message);
 
           io.to(`user:${receiverId}`).emit("conversation:update", {
             conversationId: conversation.id,
@@ -132,7 +136,13 @@ export function registerChatSocket(io: Server) {
 
       const room = getConversationRoom(userId, toUserId);
 
+      // ORIGINAL
       io.to(room).emit("typing:start", {
+        fromUserId: userId,
+      });
+
+      // 🔥 FIX
+      io.to(`user:${toUserId}`).emit("typing:start", {
         fromUserId: userId,
       });
     });
@@ -142,7 +152,13 @@ export function registerChatSocket(io: Server) {
 
       const room = getConversationRoom(userId, toUserId);
 
+      // ORIGINAL
       io.to(room).emit("typing:stop", {
+        fromUserId: userId,
+      });
+
+      // 🔥 FIX
+      io.to(`user:${toUserId}`).emit("typing:stop", {
         fromUserId: userId,
       });
     });

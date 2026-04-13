@@ -172,15 +172,16 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     /* =========================
-       REALTIME SOCKET
+       REALTIME SOCKET (FIXED)
     ========================= */
 
     try {
       const io = req.app.get("io");
 
       if (io) {
-        io.to(`user:${receiverId}`).emit("message:new", message);
-        io.to(`user:${senderId}`).emit("message:new", message);
+        // ✅ FIX: remove "user:" prefix so it matches your join room
+        io.to(receiverId).emit("message:new", message);
+        io.to(senderId).emit("message:new", message);
 
         console.log("🔥 Socket message emitted:", message.id);
       }
@@ -212,7 +213,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
           title: `${sender.name || "Someone"} sent you a message 💬`,
           body: messageBody,
           data: {
-            url: `/chat/${senderId}`, // 🔥 opens correct chat
+            url: `/chat/${senderId}`,
           },
         });
 

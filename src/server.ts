@@ -24,7 +24,7 @@ const server = http.createServer(app);
 app.use(
   "/uploads",
   express.static("uploads", {
-    fallthrough: false, // 🚨 prevents middleware from running after
+    fallthrough: false,
     maxAge: "7d",
   })
 );
@@ -100,6 +100,18 @@ io.on("connection", (socket) => {
   socket.on("chat:join", (userId: string) => {
     socket.join(userId);
     console.log("👤 User joined room:", userId);
+  });
+
+  /* =========================
+     🔥 TYPING EVENTS (ADDED ONLY THIS)
+  ========================= */
+
+  socket.on("typing:start", ({ to }) => {
+    socket.to(to).emit("typing:start");
+  });
+
+  socket.on("typing:stop", ({ to }) => {
+    socket.to(to).emit("typing:stop");
   });
 
   socket.on("disconnect", () => {

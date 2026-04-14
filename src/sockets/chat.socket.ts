@@ -129,30 +129,18 @@ export function registerChatSocket(io: Server) {
        TYPING
     ========================= */
 
-    // ✅ FIXED PARAM NAME (ONLY CHANGE)
+    // ✅ FIXED: ONLY USER ROOM (removed conversation room emit)
     socket.on("typing:start", ({ to }) => {
       if (!to) return;
-
-      const room = getConversationRoom(userId, to);
-
-      io.to(room).emit("typing:start", {
-        fromUserId: userId,
-      });
 
       io.to(`user:${to}`).emit("typing:start", {
         fromUserId: userId,
       });
     });
 
-    // ✅ FIXED PARAM NAME (ONLY CHANGE)
+    // ✅ FIXED: ONLY USER ROOM (removed conversation room emit)
     socket.on("typing:stop", ({ to }) => {
       if (!to) return;
-
-      const room = getConversationRoom(userId, to);
-
-      io.to(room).emit("typing:stop", {
-        fromUserId: userId,
-      });
 
       io.to(`user:${to}`).emit("typing:stop", {
         fromUserId: userId,

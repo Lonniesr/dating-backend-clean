@@ -27,6 +27,9 @@ import photosRouter from "../modules/user/routes/photos";
 /* 🔔 NOTIFICATIONS */
 import notificationsRoutes from "../modules/user/routes/notifications";
 
+/* 🔥 NEW: UPDATE USER */
+import updateMeRoutes from "../modules/user/routes/updateMe";
+
 /* =========================
    VERIFICATION ROUTES
 ========================= */
@@ -89,6 +92,9 @@ router.use("/onboarding", onboardingRoutes);
 
 router.use("/user", userRoutes);
 router.use("/profile", profileRoutes);
+
+/* 🔥 NEW: UPDATE USER (password + profile) */
+router.use("/users", updateMeRoutes);
 
 /* ✅ NEW ROUTES REGISTERED */
 router.use("/block", blockRoutes);

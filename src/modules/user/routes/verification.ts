@@ -11,6 +11,7 @@ const router = Router();
 router.post("/", requireUser, async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
+    const { selfieUrl } = req.body; // ✅ ADD THIS
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -30,21 +31,28 @@ router.post("/", requireUser, async (req: any, res: Response) => {
       });
     }
 
+    if (!selfieUrl) {
+      return res.status(400).json({
+        error: "Selfie is required",
+      });
+    }
+
     /**
-     * In a real system this would trigger
-     * moderation review. For now we flag it.
+     * Save selfie for admin review
      */
 
     await prisma.user.update({
       where: { id: userId },
       data: {
-        verified: true,
+        verification_selfie: selfieUrl, // ✅ SAVE IMAGE
+        verification_status: "pending", // ✅ ADD STATUS
+        verified: false, // ✅ DO NOT auto verify
       },
     });
 
     return res.json({
       success: true,
-      verified: true,
+      message: "Verification submitted",
     });
 
   } catch (err) {

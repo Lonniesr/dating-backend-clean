@@ -109,10 +109,8 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
-          // ORIGINAL (unchanged)
           io.to(room).emit("message:new", message);
 
-          // 🔥 FIX — guaranteed delivery
           io.to(`user:${receiverId}`).emit("message:new", message);
 
           io.to(`user:${receiverId}`).emit("conversation:update", {
@@ -131,34 +129,32 @@ export function registerChatSocket(io: Server) {
        TYPING
     ========================= */
 
-    socket.on("typing:start", ({ toUserId }) => {
-      if (!toUserId) return;
+    // ✅ FIXED PARAM NAME (ONLY CHANGE)
+    socket.on("typing:start", ({ to }) => {
+      if (!to) return;
 
-      const room = getConversationRoom(userId, toUserId);
+      const room = getConversationRoom(userId, to);
 
-      // ORIGINAL
       io.to(room).emit("typing:start", {
         fromUserId: userId,
       });
 
-      // 🔥 FIX
-      io.to(`user:${toUserId}`).emit("typing:start", {
+      io.to(`user:${to}`).emit("typing:start", {
         fromUserId: userId,
       });
     });
 
-    socket.on("typing:stop", ({ toUserId }) => {
-      if (!toUserId) return;
+    // ✅ FIXED PARAM NAME (ONLY CHANGE)
+    socket.on("typing:stop", ({ to }) => {
+      if (!to) return;
 
-      const room = getConversationRoom(userId, toUserId);
+      const room = getConversationRoom(userId, to);
 
-      // ORIGINAL
       io.to(room).emit("typing:stop", {
         fromUserId: userId,
       });
 
-      // 🔥 FIX
-      io.to(`user:${toUserId}`).emit("typing:stop", {
+      io.to(`user:${to}`).emit("typing:stop", {
         fromUserId: userId,
       });
     });

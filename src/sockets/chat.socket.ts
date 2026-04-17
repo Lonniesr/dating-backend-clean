@@ -31,7 +31,7 @@ export function registerChatSocket(io: Server) {
     });
 
     /* =========================
-       JOIN USER ROOM (NEW)
+       JOIN USER ROOM
     ========================= */
 
     socket.on("chat:join", (id: string) => {
@@ -109,16 +109,24 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
+          // ✅ ONLY emit to conversation room
           io.to(room).emit("message:new", message);
 
-          io.to(`user:${receiverId}`).emit("message:new", message);
+          // ✅ ONLY notify if receiver NOT in chat
+          const socketsInRoom = await io.in(room).fetchSockets();
 
-          io.to(`user:${receiverId}`).emit("conversation:update", {
-            conversationId: conversation.id,
-            message,
-          });
+          const receiverInRoom = socketsInRoom.some(
+            (s) => s.data.userId === receiverId
+          );
 
-          io.to(`user:${receiverId}`).emit("notifications:update");
+          if (!receiverInRoom) {
+            io.to(`user:${receiverId}`).emit("conversation:update", {
+              conversationId: conversation.id,
+              message,
+            });
+
+            io.to(`user:${receiverId}`).emit("notifications:update");
+          }
         } catch (err) {
           console.error("CHAT MESSAGE ERROR:", err);
         }
@@ -129,20 +137,23 @@ export function registerChatSocket(io: Server) {
        TYPING
     ========================= */
 
-    // ✅ FIXED: ONLY USER ROOM (removed conversation room emit)
+    // ✅ FIXED: USE CONVERSATION ROOM
     socket.on("typing:start", ({ to }) => {
       if (!to) return;
 
-      io.to(`user:${to}`).emit("typing:start", {
+      const room = getConversationRoom(userId, to);
+
+      io.to(room).emit("typing:start", {
         fromUserId: userId,
       });
     });
 
-    // ✅ FIXED: ONLY USER ROOM (removed conversation room emit)
     socket.on("typing:stop", ({ to }) => {
       if (!to) return;
 
-      io.to(`user:${to}`).emit("typing:stop", {
+      const room = getConversationRoom(userId, to);
+
+      io.to(room).emit("typing:stop", {
         fromUserId: userId,
       });
     });

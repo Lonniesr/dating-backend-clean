@@ -109,10 +109,8 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
-          // ✅ ONLY emit to conversation room
           io.to(room).emit("message:new", message);
 
-          // ✅ ONLY notify if receiver NOT in chat
           const socketsInRoom = await io.in(room).fetchSockets();
 
           const receiverInRoom = socketsInRoom.some(
@@ -134,24 +132,29 @@ export function registerChatSocket(io: Server) {
     );
 
     /* =========================
-       TYPING
+       TYPING (FIXED)
     ========================= */
 
-    // ✅ FIXED: USE CONVERSATION ROOM
-    socket.on("typing:start", ({ to }) => {
-      if (!to) return;
+    socket.on("typing:start", (payload: any) => {
+      if (!payload || !payload.to || !userId) {
+        console.log("❌ BLOCKED bad typing:start:", payload);
+        return;
+      }
 
-      const room = getConversationRoom(userId, to);
+      const room = getConversationRoom(userId, payload.to);
 
       io.to(room).emit("typing:start", {
         fromUserId: userId,
       });
     });
 
-    socket.on("typing:stop", ({ to }) => {
-      if (!to) return;
+    socket.on("typing:stop", (payload: any) => {
+      if (!payload || !payload.to || !userId) {
+        console.log("❌ BLOCKED bad typing:stop:", payload);
+        return;
+      }
 
-      const room = getConversationRoom(userId, to);
+      const room = getConversationRoom(userId, payload.to);
 
       io.to(room).emit("typing:stop", {
         fromUserId: userId,

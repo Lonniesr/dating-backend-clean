@@ -47,6 +47,7 @@ export function registerChatSocket(io: Server) {
       if (!otherUserId) return;
 
       const room = getConversationRoom(userId, otherUserId);
+      console.log("👥 JOIN:", userId, "→", room);
       socket.join(room);
     });
 
@@ -132,10 +133,12 @@ export function registerChatSocket(io: Server) {
     );
 
     /* =========================
-       TYPING (FIXED)
+       🔥 TYPING (DEBUG + GUARDED)
     ========================= */
 
     socket.on("typing:start", (payload: any) => {
+      console.log("🔥 INCOMING typing:start:", payload);
+
       if (!payload || !payload.to || !userId) {
         console.log("❌ BLOCKED bad typing:start:", payload);
         return;
@@ -143,18 +146,24 @@ export function registerChatSocket(io: Server) {
 
       const room = getConversationRoom(userId, payload.to);
 
+      console.log("⌨️ EMIT typing:start →", room);
+
       io.to(room).emit("typing:start", {
         fromUserId: userId,
       });
     });
 
     socket.on("typing:stop", (payload: any) => {
+      console.log("🔥 INCOMING typing:stop:", payload);
+
       if (!payload || !payload.to || !userId) {
         console.log("❌ BLOCKED bad typing:stop:", payload);
         return;
       }
 
       const room = getConversationRoom(userId, payload.to);
+
+      console.log("⌨️ EMIT typing:stop →", room);
 
       io.to(room).emit("typing:stop", {
         fromUserId: userId,

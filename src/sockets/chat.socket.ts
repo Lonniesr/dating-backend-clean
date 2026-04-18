@@ -133,7 +133,7 @@ export function registerChatSocket(io: Server) {
     );
 
     /* =========================
-       🔥 TYPING (DEBUG + GUARDED)
+       🔥 TYPING (FIXED + RELIABLE)
     ========================= */
 
     socket.on("typing:start", (payload: any) => {
@@ -148,7 +148,13 @@ export function registerChatSocket(io: Server) {
 
       console.log("⌨️ EMIT typing:start →", room);
 
+      // ✅ send to conversation room
       io.to(room).emit("typing:start", {
+        fromUserId: userId,
+      });
+
+      // 🔥 ALSO send directly to receiver (FIX)
+      io.to(`user:${payload.to}`).emit("typing:start", {
         fromUserId: userId,
       });
     });
@@ -165,7 +171,13 @@ export function registerChatSocket(io: Server) {
 
       console.log("⌨️ EMIT typing:stop →", room);
 
+      // ✅ room
       io.to(room).emit("typing:stop", {
+        fromUserId: userId,
+      });
+
+      // 🔥 direct user fallback (FIX)
+      io.to(`user:${payload.to}`).emit("typing:stop", {
         fromUserId: userId,
       });
     });

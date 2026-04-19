@@ -133,53 +133,61 @@ export function registerChatSocket(io: Server) {
     );
 
     /* =========================
-       🔥 TYPING (FIXED + RELIABLE)
+       🔥 TYPING (FINAL HARD FIX)
     ========================= */
 
-    socket.on("typing:start", (payload: any) => {
+    socket.on("typing:start", (...args: any[]) => {
+      const payload = args[0];
+
       console.log("🔥 INCOMING typing:start:", payload);
 
-      if (!payload || !payload.to || !userId) {
-        console.log("❌ BLOCKED bad typing:start:", payload);
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        !payload.to ||
+        typeof payload.to !== "string"
+      ) {
+        console.log("❌ INVALID typing:start payload:", payload);
         return;
       }
 
       const room = getConversationRoom(userId, payload.to);
 
-      console.log("⌨️ EMIT typing:start →", room);
-
-      // ✅ send to conversation room
-      io.to(room).emit("typing:start", {
+      const data = {
         fromUserId: userId,
-      });
+      };
 
-      // 🔥 ALSO send directly to receiver (FIX)
-      io.to(`user:${payload.to}`).emit("typing:start", {
-        fromUserId: userId,
-      });
+      console.log("⌨️ EMIT typing:start:", data);
+
+      io.to(room).emit("typing:start", data);
+      io.to(`user:${payload.to}`).emit("typing:start", data);
     });
 
-    socket.on("typing:stop", (payload: any) => {
+    socket.on("typing:stop", (...args: any[]) => {
+      const payload = args[0];
+
       console.log("🔥 INCOMING typing:stop:", payload);
 
-      if (!payload || !payload.to || !userId) {
-        console.log("❌ BLOCKED bad typing:stop:", payload);
+      if (
+        !payload ||
+        typeof payload !== "object" ||
+        !payload.to ||
+        typeof payload.to !== "string"
+      ) {
+        console.log("❌ INVALID typing:stop payload:", payload);
         return;
       }
 
       const room = getConversationRoom(userId, payload.to);
 
-      console.log("⌨️ EMIT typing:stop →", room);
-
-      // ✅ room
-      io.to(room).emit("typing:stop", {
+      const data = {
         fromUserId: userId,
-      });
+      };
 
-      // 🔥 direct user fallback (FIX)
-      io.to(`user:${payload.to}`).emit("typing:stop", {
-        fromUserId: userId,
-      });
+      console.log("⌨️ EMIT typing:stop:", data);
+
+      io.to(room).emit("typing:stop", data);
+      io.to(`user:${payload.to}`).emit("typing:stop", data);
     });
 
     /* =========================

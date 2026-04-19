@@ -47,8 +47,21 @@ export function registerChatSocket(io: Server) {
       if (!otherUserId) return;
 
       const room = getConversationRoom(userId, otherUserId);
-      console.log("👥 JOIN:", userId, "→", room);
+
       socket.join(room);
+
+      console.log("👥 JOIN:", userId, "→", room);
+
+      // 🔥 DEBUG: how many users are in this room RIGHT NOW
+      const clients = io.sockets.adapter.rooms.get(room);
+
+      console.log(
+        "👥 ROOM USERS:",
+        room,
+        clients ? Array.from(clients) : "none",
+        "COUNT:",
+        clients?.size || 0
+      );
     });
 
     /* =========================
@@ -110,10 +123,8 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
-          // ✅ emit to room (active chat users)
           io.to(room).emit("message:new", message);
 
-          // 🔥 ALWAYS emit directly to receiver (fix)
           io.to(`user:${receiverId}`).emit("conversation:update", {
             conversationId: conversation.id,
             message,

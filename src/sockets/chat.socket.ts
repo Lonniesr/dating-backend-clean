@@ -52,7 +52,7 @@ export function registerChatSocket(io: Server) {
     });
 
     /* =========================
-       SEND MESSAGE
+       SEND MESSAGE (FIXED)
     ========================= */
 
     socket.on(
@@ -110,22 +110,17 @@ export function registerChatSocket(io: Server) {
 
           const room = getConversationRoom(userId, receiverId);
 
+          // ✅ emit to room (active chat users)
           io.to(room).emit("message:new", message);
 
-          const socketsInRoom = await io.in(room).fetchSockets();
+          // 🔥 ALWAYS emit directly to receiver (fix)
+          io.to(`user:${receiverId}`).emit("conversation:update", {
+            conversationId: conversation.id,
+            message,
+          });
 
-          const receiverInRoom = socketsInRoom.some(
-            (s) => s.data.userId === receiverId
-          );
+          io.to(`user:${receiverId}`).emit("notifications:update");
 
-          if (!receiverInRoom) {
-            io.to(`user:${receiverId}`).emit("conversation:update", {
-              conversationId: conversation.id,
-              message,
-            });
-
-            io.to(`user:${receiverId}`).emit("notifications:update");
-          }
         } catch (err) {
           console.error("CHAT MESSAGE ERROR:", err);
         }
@@ -133,58 +128,26 @@ export function registerChatSocket(io: Server) {
     );
 
     /* =========================
-       🔥 TYPING (FINAL HARD FIX)
+       TYPING
     ========================= */
 
-    socket.on("typing:start", (...args: any[]) => {
-      const payload = args[0];
-
-      console.log("🔥 INCOMING typing:start:", payload);
-
-      if (
-        !payload ||
-        typeof payload !== "object" ||
-        !payload.to ||
-        typeof payload.to !== "string"
-      ) {
-        console.log("❌ INVALID typing:start payload:", payload);
-        return;
-      }
+    socket.on("typing:start", (payload: any) => {
+      if (!payload?.to) return;
 
       const room = getConversationRoom(userId, payload.to);
 
-      const data = {
-        fromUserId: userId,
-      };
-
-      console.log("⌨️ EMIT typing:start:", data);
+      const data = { fromUserId: userId };
 
       io.to(room).emit("typing:start", data);
       io.to(`user:${payload.to}`).emit("typing:start", data);
     });
 
-    socket.on("typing:stop", (...args: any[]) => {
-      const payload = args[0];
-
-      console.log("🔥 INCOMING typing:stop:", payload);
-
-      if (
-        !payload ||
-        typeof payload !== "object" ||
-        !payload.to ||
-        typeof payload.to !== "string"
-      ) {
-        console.log("❌ INVALID typing:stop payload:", payload);
-        return;
-      }
+    socket.on("typing:stop", (payload: any) => {
+      if (!payload?.to) return;
 
       const room = getConversationRoom(userId, payload.to);
 
-      const data = {
-        fromUserId: userId,
-      };
-
-      console.log("⌨️ EMIT typing:stop:", data);
+      const data = { fromUserId: userId };
 
       io.to(room).emit("typing:stop", data);
       io.to(`user:${payload.to}`).emit("typing:stop", data);

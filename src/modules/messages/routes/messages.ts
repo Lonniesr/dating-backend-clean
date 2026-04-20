@@ -62,10 +62,23 @@ router.get("/:id", requireUser, async (req: any, res) => {
 
     const isBlocked = !!block;
 
+    /* =========================
+       🔥 FIX: INCLUDE SENDER DATA
+    ========================= */
+
     const messages = await prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: { createdAt: "desc" },
       take: 50,
+
+      include: {
+        sender: {
+          select: {
+            id: true,
+            photoUrl: true,
+          },
+        },
+      },
     });
 
     await prisma.message.updateMany({
@@ -172,14 +185,13 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     /* =========================
-       REALTIME SOCKET (FIXED)
+       SOCKET
     ========================= */
 
     try {
       const io = req.app.get("io");
 
       if (io) {
-        // ✅ FIX: remove "user:" prefix so it matches your join room
         io.to(receiverId).emit("message:new", message);
         io.to(senderId).emit("message:new", message);
 
@@ -190,7 +202,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
     }
 
     /* =========================
-       PUSH NOTIFICATION (UPDATED)
+       PUSH
     ========================= */
 
     try {

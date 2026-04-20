@@ -63,7 +63,7 @@ router.get("/:id", requireUser, async (req: any, res) => {
     const isBlocked = !!block;
 
     /* =========================
-       🔥 FIX: INCLUDE SENDER DATA
+       🔥 FIX: USE PHOTOS RELATION
     ========================= */
 
     const messages = await prisma.message.findMany({
@@ -75,7 +75,12 @@ router.get("/:id", requireUser, async (req: any, res) => {
         sender: {
           select: {
             id: true,
-            photoUrl: true,
+            photos: {
+              select: {
+                url: true,
+              },
+              take: 1,
+            },
           },
         },
       },
@@ -158,10 +163,6 @@ router.post("/:id", requireUser, async (req: any, res) => {
       });
     }
 
-    /* =========================
-       CREATE MESSAGE
-    ========================= */
-
     const message = await prisma.message.create({
       data: {
         senderId,
@@ -184,26 +185,17 @@ router.post("/:id", requireUser, async (req: any, res) => {
       },
     });
 
-    /* =========================
-       SOCKET
-    ========================= */
-
     try {
       const io = req.app.get("io");
 
       if (io) {
         io.to(receiverId).emit("message:new", message);
         io.to(senderId).emit("message:new", message);
-
         console.log("🔥 Socket message emitted:", message.id);
       }
     } catch (err) {
       console.error("❌ Socket emit error:", err);
     }
-
-    /* =========================
-       PUSH
-    ========================= */
 
     try {
       const receiver = await prisma.user.findUnique({
@@ -211,30 +203,16 @@ router.post("/:id", requireUser, async (req: any, res) => {
         select: { pushToken: true },
       });
 
-      console.log("📲 Receiver push token:", receiver?.pushToken);
-
       if (receiver?.pushToken && !blocked) {
-        const messageBody =
-          text ||
-          (imageUrl && "📸 Sent you a photo") ||
-          (audioUrl && "🎤 Sent you a voice message") ||
-          "New message";
-
         await sendPushNotification({
           token: receiver.pushToken,
           title: `${sender.name || "Someone"} sent you a message 💬`,
-          body: messageBody,
-          data: {
-            url: `/chat/${senderId}`,
-          },
+          body: text || "New message",
+          data: { url: `/chat/${senderId}` },
         });
-
-        console.log("🔥 Push sent to user:", receiverId);
-      } else {
-        console.log("⚠️ No push token found or user blocked");
       }
-    } catch (pushErr) {
-      console.error("❌ Push send error:", pushErr);
+    } catch (err) {
+      console.error("❌ Push error:", err);
     }
 
     return res.json(message);

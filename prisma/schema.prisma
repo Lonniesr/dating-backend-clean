@@ -283,6 +283,7 @@ model Notification {
   actorId   String?
 
   type      String
+  content   String?   // ✅ ADD THIS
 
   read      Boolean  @default(false)
 

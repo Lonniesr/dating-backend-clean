@@ -11,6 +11,24 @@ router.get("/", requireAdmin, async (_req, res) => {
   try {
     const messages = await prisma.message.findMany({
       orderBy: { createdAt: "desc" },
+
+      // ✅ THIS IS THE FIX
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        receiver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
     });
 
     res.json({ messages });

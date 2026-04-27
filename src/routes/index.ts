@@ -63,6 +63,9 @@ import analyticsRouter from "../modules/admin/routes/admin.analytics";
 /* 🔥 NEW: ADMIN SEARCH */
 import adminSearchRoutes from "../modules/admin/routes/admin.search";
 
+/* 🔥 NEW: ADMIN NOTIFICATIONS (FIX) */
+import adminNotificationsRoutes from "../modules/admin/routes/admin.notifications";
+
 /* =========================
    NEW: BLOCK & REPORT ROUTES
 ========================= */
@@ -169,5 +172,8 @@ router.use("/admin/search", adminSearchRoutes);
 router.use("/admin/messages", adminMessagesRoutes);
 router.use("/admin/settings", adminSettingsRoutes);
 router.use("/admin/analytics", analyticsRouter);
+
+/* 🔥 FIX: ADMIN NOTIFICATIONS ROUTE (THIS WAS MISSING) */
+router.use("/admin/notifications", adminNotificationsRoutes);
 
 export default router;

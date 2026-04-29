@@ -27,4 +27,68 @@ router.get("/", requireAdmin, async (_req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/bans/:userId
+ * 👉 BAN USER
+ */
+router.post("/:userId", requireAdmin, async (req, res) => {
+  try {
+    const userIdParam = req.params.userId;
+
+    // ✅ FIX: ensure it's a string
+    const userId = Array.isArray(userIdParam)
+      ? userIdParam[0]
+      : userIdParam;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Invalid userId" });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { banned: true },
+    });
+
+    return res.json({
+      success: true,
+      user,
+    });
+  } catch (err) {
+    console.error("BAN USER ERROR:", err);
+    return res.status(500).json({ error: "Failed to ban user" });
+  }
+});
+
+/**
+ * DELETE /api/admin/bans/:userId
+ * 👉 UNBAN USER
+ */
+router.delete("/:userId", requireAdmin, async (req, res) => {
+  try {
+    const userIdParam = req.params.userId;
+
+    // ✅ FIX: ensure it's a string
+    const userId = Array.isArray(userIdParam)
+      ? userIdParam[0]
+      : userIdParam;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Invalid userId" });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { banned: false },
+    });
+
+    return res.json({
+      success: true,
+      user,
+    });
+  } catch (err) {
+    console.error("UNBAN USER ERROR:", err);
+    return res.status(500).json({ error: "Failed to unban user" });
+  }
+});
+
 export default router;

@@ -11,15 +11,20 @@ router.get("/", requireAdmin, async (_req, res) => {
   try {
     const users = await prisma.user.findMany({
       where: { banned: true },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-      },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "desc" }, // ✅ safe field
     });
 
-    res.json({ users });
+    // ✅ map manually so TS doesn't complain
+    const formatted = users.map((u: any) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      bannedAt: u.bannedAt,
+      banReason: u.banReason,
+      banExpiresAt: u.banExpiresAt,
+    }));
+
+    res.json({ users: formatted });
   } catch (err) {
     console.error("ADMIN BANS ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -40,10 +45,25 @@ router.post("/:userId", requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invalid userId" });
     }
 
+    const { reason, durationHours } = req.body;
+
+    const now = new Date();
+
+    const banExpiresAt =
+      durationHours && durationHours > 0
+        ? new Date(now.getTime() + durationHours * 60 * 60 * 1000)
+        : null;
+
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         banned: true,
+        ...( {
+          banReason: reason || "Violation of guidelines",
+          bannedAt: now,
+          bannedBy: (req as any).user?.id || "admin",
+          banExpiresAt,
+        } as any ),
       },
     });
 
@@ -51,7 +71,9 @@ router.post("/:userId", requireAdmin, async (req, res) => {
       data: {
         userId,
         type: "admin",
-        content: "Your account has been banned.",
+        content: `Your account has been banned. Reason: ${
+          reason || "Violation of guidelines"
+        }`,
       },
     });
 
@@ -80,6 +102,12 @@ router.delete("/:userId", requireAdmin, async (req, res) => {
       where: { id: userId },
       data: {
         banned: false,
+        ...( {
+          banReason: null,
+          bannedAt: null,
+          bannedBy: null,
+          banExpiresAt: null,
+        } as any ),
       },
     });
 

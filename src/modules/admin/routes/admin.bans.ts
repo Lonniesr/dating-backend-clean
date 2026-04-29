@@ -9,18 +9,20 @@ const router = Router();
  */
 router.get("/", requireAdmin, async (_req, res) => {
   try {
-    const bannedUsers = await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       where: { banned: true },
       select: {
         id: true,
         email: true,
         name: true,
-        createdAt: true,
+        bannedAt: true,
+        banReason: true,
+        banExpiresAt: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { bannedAt: "desc" },
     });
 
-    res.json({ users: bannedUsers });
+    res.json({ users });
   } catch (err) {
     console.error("ADMIN BANS ERROR:", err);
     res.status(500).json({ error: "Server error" });
@@ -29,65 +31,79 @@ router.get("/", requireAdmin, async (_req, res) => {
 
 /**
  * POST /api/admin/bans/:userId
- * 👉 BAN USER
+ * BAN USER
  */
 router.post("/:userId", requireAdmin, async (req, res) => {
   try {
-    const userIdParam = req.params.userId;
+    const userId = req.params.userId;
 
-    // ✅ FIX: ensure it's a string
-    const userId = Array.isArray(userIdParam)
-      ? userIdParam[0]
-      : userIdParam;
+    const { reason, durationHours } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({ error: "Invalid userId" });
-    }
+    const now = new Date();
+
+    const banExpiresAt =
+      durationHours && durationHours > 0
+        ? new Date(now.getTime() + durationHours * 60 * 60 * 1000)
+        : null;
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { banned: true },
+      data: {
+        banned: true,
+        banReason: reason || "Violation of guidelines",
+        bannedAt: now,
+        bannedBy: (req as any).user?.id || "admin",
+        banExpiresAt,
+      },
     });
 
-    return res.json({
-      success: true,
-      user,
+    // 🔔 Notify user
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: "admin",
+        content: `Your account has been banned. Reason: ${reason || "Violation of guidelines"}`,
+      },
     });
+
+    return res.json({ success: true, user });
   } catch (err) {
     console.error("BAN USER ERROR:", err);
-    return res.status(500).json({ error: "Failed to ban user" });
+    res.status(500).json({ error: "Failed to ban user" });
   }
 });
 
 /**
  * DELETE /api/admin/bans/:userId
- * 👉 UNBAN USER
+ * UNBAN USER
  */
 router.delete("/:userId", requireAdmin, async (req, res) => {
   try {
-    const userIdParam = req.params.userId;
-
-    // ✅ FIX: ensure it's a string
-    const userId = Array.isArray(userIdParam)
-      ? userIdParam[0]
-      : userIdParam;
-
-    if (!userId) {
-      return res.status(400).json({ error: "Invalid userId" });
-    }
+    const userId = req.params.userId;
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { banned: false },
+      data: {
+        banned: false,
+        banReason: null,
+        bannedAt: null,
+        bannedBy: null,
+        banExpiresAt: null,
+      },
     });
 
-    return res.json({
-      success: true,
-      user,
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: "admin",
+        content: "Your account has been unbanned.",
+      },
     });
+
+    return res.json({ success: true, user });
   } catch (err) {
     console.error("UNBAN USER ERROR:", err);
-    return res.status(500).json({ error: "Failed to unban user" });
+    res.status(500).json({ error: "Failed to unban user" });
   }
 });
 

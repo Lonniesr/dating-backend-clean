@@ -29,7 +29,7 @@ model User {
 
   bio                String?
   birthplace         String?
-  location           String   @default("Nearby") // ✅ FIXED
+  location           String   @default("Nearby")
 
   latitude           Float?
   longitude          Float?
@@ -43,7 +43,12 @@ model User {
   verification_status String? @default("unverified")
   verification_selfie String?
 
-  banned             Boolean  @default(false)
+  // 🔥 MODERATION SYSTEM (UPDATED)
+  banned             Boolean   @default(false)
+  banReason          String?
+  bannedAt           DateTime?
+  bannedBy           String?
+  banExpiresAt       DateTime?
 
   lastActiveAt       DateTime?
 

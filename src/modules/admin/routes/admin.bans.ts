@@ -15,11 +15,8 @@ router.get("/", requireAdmin, async (_req, res) => {
         id: true,
         email: true,
         name: true,
-        bannedAt: true,
-        banReason: true,
-        banExpiresAt: true,
       },
-      orderBy: { bannedAt: "desc" },
+      orderBy: { createdAt: "desc" }, // ✅ safe field
     });
 
     res.json({ users });
@@ -31,38 +28,30 @@ router.get("/", requireAdmin, async (_req, res) => {
 
 /**
  * POST /api/admin/bans/:userId
- * BAN USER
  */
 router.post("/:userId", requireAdmin, async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userIdParam = req.params.userId;
+    const userId = Array.isArray(userIdParam)
+      ? userIdParam[0]
+      : userIdParam;
 
-    const { reason, durationHours } = req.body;
-
-    const now = new Date();
-
-    const banExpiresAt =
-      durationHours && durationHours > 0
-        ? new Date(now.getTime() + durationHours * 60 * 60 * 1000)
-        : null;
+    if (!userId) {
+      return res.status(400).json({ error: "Invalid userId" });
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         banned: true,
-        banReason: reason || "Violation of guidelines",
-        bannedAt: now,
-        bannedBy: (req as any).user?.id || "admin",
-        banExpiresAt,
       },
     });
 
-    // 🔔 Notify user
     await prisma.notification.create({
       data: {
         userId,
         type: "admin",
-        content: `Your account has been banned. Reason: ${reason || "Violation of guidelines"}`,
+        content: "Your account has been banned.",
       },
     });
 
@@ -75,20 +64,22 @@ router.post("/:userId", requireAdmin, async (req, res) => {
 
 /**
  * DELETE /api/admin/bans/:userId
- * UNBAN USER
  */
 router.delete("/:userId", requireAdmin, async (req, res) => {
   try {
-    const userId = req.params.userId;
+    const userIdParam = req.params.userId;
+    const userId = Array.isArray(userIdParam)
+      ? userIdParam[0]
+      : userIdParam;
+
+    if (!userId) {
+      return res.status(400).json({ error: "Invalid userId" });
+    }
 
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         banned: false,
-        banReason: null,
-        bannedAt: null,
-        bannedBy: null,
-        banExpiresAt: null,
       },
     });
 

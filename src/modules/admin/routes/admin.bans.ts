@@ -16,7 +16,7 @@ router.get("/", requireAdmin, async (_req, res) => {
         email: true,
         name: true,
       },
-      orderBy: { createdAt: "desc" }, // ✅ safe field
+      orderBy: { createdAt: "desc" },
     });
 
     res.json({ users });

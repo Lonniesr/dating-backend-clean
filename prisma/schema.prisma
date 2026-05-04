@@ -80,7 +80,7 @@ model User {
 
   photos             Photo[]
 
-  // ✅ PRIVATE PHOTO SYSTEM
+  // 🔒 PRIVATE PHOTO SYSTEM
   photoRequestsSent      PhotoAccessRequest[] @relation("Requester")
   photoRequestsReceived  PhotoAccessRequest[] @relation("Owner")
 
@@ -119,7 +119,7 @@ model PhotoAccessRequest {
   ownerId     String
 
   message     String?
-  status      String   @default("pending") // pending | approved | denied
+  status      String   @default("pending")
 
   createdAt   DateTime @default(now())
 
@@ -173,7 +173,6 @@ model Conversation {
 
   messages Message[]
 
-  // ✅ FIXED RELATION
   lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [id])
 
   @@unique([userAId, userBId])
@@ -182,8 +181,32 @@ model Conversation {
 model Invite {
   id         Int      @id @default(autoincrement())
   code       String   @unique
+
   createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+
+  email      String?
+  premium    Boolean  @default(false)
+
   used       Boolean  @default(false)
+  usedAt     DateTime?
+
+  maxUses    Int?
+  usedCount  Int      @default(0)
+
+  invitedById String?
+  usedById    String?
+
+  scanCount   Int @default(0)
+  signupCount Int @default(0)
+
+  // ✅ FIXED RELATIONS
+  invitedBy User? @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id], onDelete: SetNull)
+  usedBy    User? @relation("Invite_usedByIdToUser", fields: [usedById], references: [id], onDelete: SetNull)
+
+  @@index([code])
+  @@index([invitedById])
+  @@index([usedById])
 }
 
 model Match {
@@ -226,7 +249,7 @@ model Message {
   replyTo Message? @relation("MessageReply", fields: [replyToId], references: [id])
   replies Message[] @relation("MessageReply")
 
-  // ✅ REQUIRED FOR lastMessage RELATION
+  // ✅ REQUIRED FOR lastMessage
   lastInConversations Conversation[] @relation("LastMessage")
 
   @@index([conversationId])

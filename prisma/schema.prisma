@@ -80,7 +80,7 @@ model User {
 
   photos             Photo[]
 
-  // 🔒 PRIVATE PHOTO SYSTEM
+  // ✅ NEW (private photo system)
   photoRequestsSent      PhotoAccessRequest[] @relation("Requester")
   photoRequestsReceived  PhotoAccessRequest[] @relation("Owner")
 
@@ -94,23 +94,40 @@ model User {
   @@index([latitude, longitude])
 }
 
+model Feedback {
+  id        String   @id @default(uuid())
+
+  userId    String
+  message   String
+  page      String?
+
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model Photo {
   id        String   @id @default(uuid())
   userId    String
   url       String
   order     Int
 
+  // ✅ NEW
   isPrivate Boolean  @default(false)
 
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // ✅ NEW
   requests PhotoAccessRequest[]
 
   @@index([userId])
 }
 
+// ✅ NEW MODEL
 model PhotoAccessRequest {
   id          String   @id @default(uuid())
 
@@ -119,7 +136,7 @@ model PhotoAccessRequest {
   ownerId     String
 
   message     String?
-  status      String   @default("pending")
+  status      String   @default("pending") // pending | approved | denied
 
   createdAt   DateTime @default(now())
 
@@ -132,22 +149,12 @@ model PhotoAccessRequest {
   @@index([requesterId])
 }
 
-model Feedback {
-  id        String   @id @default(uuid())
-  userId    String
-  message   String
-  page      String?
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
 model Admin {
   id        String   @id @default(uuid())
+
   email     String   @unique
   password  String
+
   createdAt DateTime @default(now())
 
   userId    String?  @unique
@@ -155,6 +162,15 @@ model Admin {
   user      User?    @relation(fields: [userId], references: [id])
 
   @@index([email])
+}
+
+model AdminSettings {
+  id              String   @id @default("admin-settings")
+  maintenanceMode Boolean  @default(false)
+  siteName        String   @default("Lynq Admin")
+  supportEmail    String   @default("support@example.com")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Conversation {
@@ -174,6 +190,10 @@ model Conversation {
   messages Message[]
 
   lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [id])
+
+  @@index([userAId])
+  @@index([userBId])
+  @@index([updatedAt])
 
   @@unique([userAId, userBId])
 }
@@ -200,13 +220,29 @@ model Invite {
   scanCount   Int @default(0)
   signupCount Int @default(0)
 
-  // ✅ FIXED RELATIONS
   invitedBy User? @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id], onDelete: SetNull)
   usedBy    User? @relation("Invite_usedByIdToUser", fields: [usedById], references: [id], onDelete: SetNull)
+
+  scans InviteScan[]
 
   @@index([code])
   @@index([invitedById])
   @@index([usedById])
+}
+
+model InviteScan {
+  id        Int      @id @default(autoincrement())
+  inviteId  Int
+  createdAt DateTime @default(now())
+
+  device    String?
+  browser   String?
+  os        String?
+  ip        String?
+
+  invite    Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+  @@index([inviteId])
 }
 
 model Match {
@@ -220,6 +256,8 @@ model Match {
   userB     User @relation("Match_userB", fields: [userBId], references: [id], onDelete: Cascade)
 
   @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
 }
 
 model Message {
@@ -249,8 +287,10 @@ model Message {
   replyTo Message? @relation("MessageReply", fields: [replyToId], references: [id])
   replies Message[] @relation("MessageReply")
 
-  // ✅ REQUIRED FOR lastMessage
-  lastInConversations Conversation[] @relation("LastMessage")
+  // ✅ FIX FOR LAST MESSAGE RELATION
+  lastInConversation Conversation[] @relation("LastMessage")
+
+  lastInConversation Conversation[] @relation("LastMessage")
 
   @@index([conversationId])
   @@index([senderId])
@@ -272,6 +312,8 @@ model Swipe {
   target User @relation("Swipe_targetIdToUser", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@unique([swiperId, targetId])
+  @@index([swiperId])
+  @@index([targetId])
 }
 
 model Notification {
@@ -304,6 +346,8 @@ model Block {
   blocked   User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }
 
 model Report {

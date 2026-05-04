@@ -32,7 +32,8 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
     const photos = await prisma.photo.findMany({
       where: { userId },
       orderBy: { order: "asc" },
-      select: { url: true },
+      // ✅ FIXED
+      select: { id: true, url: true, isPrivate: true },
     });
 
     const invitesSent = await prisma.invite.count({
@@ -61,7 +62,14 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
       location: user.location,
       latitude: user.latitude,
       longitude: user.longitude,
-      photos: photos.map((p) => p.url),
+
+      // ✅ FIXED
+      photos: photos.map((p) => ({
+        id: p.id,
+        url: p.url,
+        isPrivate: p.isPrivate,
+      })),
+
       prompts: user.prompts || {},
       preferences: user.preferences || {},
       verified: user.verified,
@@ -101,7 +109,8 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
     const photos = await prisma.photo.findMany({
       where: { userId: param },
       orderBy: { order: "asc" },
-      select: { url: true },
+      // ✅ FIXED
+      select: { id: true, url: true, isPrivate: true },
     });
 
     return res.json({
@@ -115,7 +124,14 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
       location: user.location,
       latitude: user.latitude,
       longitude: user.longitude,
-      photos: photos.map((p) => p.url),
+
+      // ✅ FIXED
+      photos: photos.map((p) => ({
+        id: p.id,
+        url: p.url,
+        isPrivate: p.isPrivate,
+      })),
+
       prompts: user.prompts || {},
       verified: user.verified,
       verification_status: user.verification_status,
@@ -144,7 +160,6 @@ router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
       select: { preferences: true },
     });
 
-    // 🔥 FIX: safely coerce Prisma JSON → object
     const existingPrefs =
       typeof existingUser?.preferences === "object" &&
       existingUser?.preferences !== null

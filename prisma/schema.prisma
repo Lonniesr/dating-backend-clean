@@ -136,7 +136,7 @@ model PhotoAccessRequest {
   ownerId     String
 
   message     String?
-  status      String   @default("pending") // pending | approved | denied
+  status      String   @default("pending")
 
   createdAt   DateTime @default(now())
 
@@ -287,9 +287,7 @@ model Message {
   replyTo Message? @relation("MessageReply", fields: [replyToId], references: [id])
   replies Message[] @relation("MessageReply")
 
-  // ✅ FIX FOR LAST MESSAGE RELATION
-  lastInConversation Conversation[] @relation("LastMessage")
-
+  // ✅ FIXED (ONLY ONCE)
   lastInConversation Conversation[] @relation("LastMessage")
 
   @@index([conversationId])

@@ -24,6 +24,9 @@ import matchCountRoutes from "../modules/user/routes/matchCount";
 import statsRoutes from "../modules/user/routes/stats";
 import photosRouter from "../modules/user/routes/photos";
 
+/* 🔥 NEW: PRIVATE PHOTO REQUESTS */
+import photoRequestsRoutes from "../modules/user/routes/photo.requests";
+
 /* 🔔 NOTIFICATIONS */
 import notificationsRoutes from "../modules/user/routes/notifications";
 
@@ -104,6 +107,10 @@ router.use("/block", blockRoutes);
 router.use("/report", reportRoutes);
 
 router.use("/user/photos", photosRouter);
+
+/* 🔥 NEW: PRIVATE PHOTO REQUESTS (MOUNTED HERE) */
+router.use("/user/photo", photoRequestsRoutes);
+
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);

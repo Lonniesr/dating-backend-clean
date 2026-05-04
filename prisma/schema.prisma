@@ -43,7 +43,6 @@ model User {
   verification_status String? @default("unverified")
   verification_selfie String?
 
-  // 🔥 MODERATION SYSTEM (UPDATED)
   banned             Boolean   @default(false)
   banReason          String?
   bannedAt           DateTime?
@@ -81,6 +80,10 @@ model User {
 
   photos             Photo[]
 
+  // ✅ NEW
+  photoRequestsSent      PhotoAccessRequest[] @relation("Requester")
+  photoRequestsReceived  PhotoAccessRequest[] @relation("Owner")
+
   notifications      Notification[]
 
   feedbacks          Feedback[]
@@ -91,54 +94,62 @@ model User {
   @@index([latitude, longitude])
 }
 
-model Feedback {
-  id        String   @id @default(uuid())
-
-  userId    String
-  message   String
-  page      String?
-
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
 model Photo {
   id        String   @id @default(uuid())
   userId    String
   url       String
   order     Int
+
+  isPrivate Boolean  @default(false)
+
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  requests PhotoAccessRequest[]
+
+  @@index([userId])
+}
+
+model PhotoAccessRequest {
+  id          String   @id @default(uuid())
+
+  photoId     String
+  requesterId String
+  ownerId     String
+
+  message     String?
+  status      String   @default("pending")
+
+  createdAt   DateTime @default(now())
+
+  photo     Photo @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  requester User  @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  owner     User  @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([photoId, requesterId])
+  @@index([ownerId])
+  @@index([requesterId])
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  page      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
 }
 
 model Admin {
   id        String   @id @default(uuid())
-
   email     String   @unique
   password  String
-
   createdAt DateTime @default(now())
-
   userId    String?  @unique
-
   user      User?    @relation(fields: [userId], references: [id])
-
   @@index([email])
-}
-
-model AdminSettings {
-  id              String   @id @default("admin-settings")
-  maintenanceMode Boolean  @default(false)
-  siteName        String   @default("Lynq Admin")
-  supportEmail    String   @default("support@example.com")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
 }
 
 model Conversation {
@@ -159,170 +170,67 @@ model Conversation {
 
   lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [id])
 
-  @@index([userAId])
-  @@index([userBId])
-  @@index([updatedAt])
-
   @@unique([userAId, userBId])
 }
 
 model Invite {
   id         Int      @id @default(autoincrement())
   code       String   @unique
-
   createdAt  DateTime @default(now())
-  expiresAt  DateTime?
-
-  email      String?
-  premium    Boolean  @default(false)
-
   used       Boolean  @default(false)
-  usedAt     DateTime?
-
-  maxUses    Int?
-  usedCount  Int      @default(0)
-
-  invitedById String?
-  usedById    String?
-
-  scanCount   Int @default(0)
-  signupCount Int @default(0)
-
-  invitedBy User? @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id], onDelete: SetNull)
-  usedBy    User? @relation("Invite_usedByIdToUser", fields: [usedById], references: [id], onDelete: SetNull)
-
-  scans InviteScan[]
-
-  @@index([code])
-  @@index([invitedById])
-  @@index([usedById])
-}
-
-model InviteScan {
-  id        Int      @id @default(autoincrement())
-  inviteId  Int
-  createdAt DateTime @default(now())
-
-  device    String?
-  browser   String?
-  os        String?
-  ip        String?
-
-  invite    Invite   @relation(fields: [inviteId], references: [id], onDelete: Cascade)
-
-  @@index([inviteId])
 }
 
 model Match {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
-
   userAId   String
   userBId   String
-
   userA     User @relation("Match_userA", fields: [userAId], references: [id], onDelete: Cascade)
   userB     User @relation("Match_userB", fields: [userBId], references: [id], onDelete: Cascade)
-
   @@unique([userAId, userBId])
-  @@index([userAId])
-  @@index([userBId])
 }
 
 model Message {
   id String @id @default(uuid())
-
   conversationId String
-
   senderId String
   receiverId String
-
   text String?
-
-  imageUrl String?
-  audioUrl String?
-
-  replyToId String?
-
-  read Boolean @default(false)
-
   createdAt DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
-
-  sender User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-
-  replyTo Message? @relation("MessageReply", fields: [replyToId], references: [id])
-  replies Message[] @relation("MessageReply")
-
-  lastInConversation Conversation[] @relation("LastMessage")
-
-  @@index([conversationId])
-  @@index([senderId])
-  @@index([receiverId])
+  sender User @relation("SentMessages", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedMessages", fields: [receiverId], references: [id])
 }
 
 model Swipe {
   id        String   @id @default(uuid())
-
   swiperId  String
   targetId  String
-
   liked     Boolean
-  superLike Boolean  @default(false)
-
   createdAt DateTime @default(now())
 
-  swiper User @relation("Swipe_swiperIdToUser", fields: [swiperId], references: [id], onDelete: Cascade)
-  target User @relation("Swipe_targetIdToUser", fields: [targetId], references: [id], onDelete: Cascade)
-
-  @@unique([swiperId, targetId])
-  @@index([swiperId])
-  @@index([targetId])
+  swiper User @relation("Swipe_swiperIdToUser", fields: [swiperId], references: [id])
+  target User @relation("Swipe_targetIdToUser", fields: [targetId], references: [id])
 }
 
 model Notification {
   id        String   @id @default(uuid())
-
   userId    String
-  actorId   String?
-
   type      String
-  content   String?   // ✅ ADD THIS
-
   read      Boolean  @default(false)
-
   createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 model Block {
   id        String   @id @default(uuid())
-
   blockerId String
   blockedId String
-
   createdAt DateTime @default(now())
 
-  blocker   User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked   User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker User @relation("Blocker", fields: [blockerId], references: [id])
+  blocked User @relation("Blocked", fields: [blockedId], references: [id])
 
   @@unique([blockerId, blockedId])
-  @@index([blockerId])
-  @@index([blockedId])
-}
-
-model Report {
-  id          String   @id @default(uuid())
-  reporterId  String
-  reportedId  String
-  reason      String
-  description String?
-  createdAt   DateTime @default(now())
-
-  @@index([reporterId])
-  @@index([reportedId])
 }

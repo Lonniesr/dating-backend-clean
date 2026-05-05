@@ -32,7 +32,6 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
     const photos = await prisma.photo.findMany({
       where: { userId },
       orderBy: { order: "asc" },
-      // ✅ FIXED
       select: { id: true, url: true, isPrivate: true },
     });
 
@@ -62,14 +61,11 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
       location: user.location,
       latitude: user.latitude,
       longitude: user.longitude,
-
-      // ✅ FIXED
       photos: photos.map((p) => ({
         id: p.id,
         url: p.url,
         isPrivate: p.isPrivate,
       })),
-
       prompts: user.prompts || {},
       preferences: user.preferences || {},
       verified: user.verified,
@@ -109,7 +105,6 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
     const photos = await prisma.photo.findMany({
       where: { userId: param },
       orderBy: { order: "asc" },
-      // ✅ FIXED
       select: { id: true, url: true, isPrivate: true },
     });
 
@@ -124,14 +119,11 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
       location: user.location,
       latitude: user.latitude,
       longitude: user.longitude,
-
-      // ✅ FIXED
       photos: photos.map((p) => ({
         id: p.id,
         url: p.url,
         isPrivate: p.isPrivate,
       })),
-
       prompts: user.prompts || {},
       verified: user.verified,
       verification_status: user.verification_status,
@@ -192,6 +184,42 @@ router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
     return res.status(500).json({
       error: "Failed to update profile",
     });
+  }
+});
+
+/* =========================
+   🔒 TOGGLE PHOTO PRIVACY (ADDED ONLY THIS)
+========================= */
+router.put("/photo/privacy", requireUser, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { photoId, isPrivate } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!photoId || typeof isPrivate !== "boolean") {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+
+    const photo = await prisma.photo.findUnique({
+      where: { id: photoId },
+    });
+
+    if (!photo || photo.userId !== userId) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+
+    const updated = await prisma.photo.update({
+      where: { id: photoId },
+      data: { isPrivate },
+    });
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("PHOTO PRIVACY ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

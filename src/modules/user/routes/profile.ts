@@ -29,6 +29,7 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
+    // 🔥 NO ACCESS LOGIC HERE (user sees all their own photos)
     const photos = await prisma.photo.findMany({
       where: { userId },
       orderBy: { order: "asc" },
@@ -61,11 +62,7 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
       location: user.location,
       latitude: user.latitude,
       longitude: user.longitude,
-      photos: photos.map((p) => ({
-        id: p.id,
-        url: p.url,
-        isPrivate: p.isPrivate,
-      })),
+      photos,
       prompts: user.prompts || {},
       preferences: user.preferences || {},
       verified: user.verified,
@@ -88,9 +85,10 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
 ========================= */
 router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
   try {
-    const param = req.params.id;
+    const param = req.params.id as string;
+    const viewerId = req.user?.id;
 
-    if (!param || Array.isArray(param)) {
+    if (!param) {
       return res.status(400).json({ error: "Invalid user id" });
     }
 
@@ -108,6 +106,26 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
       select: { id: true, url: true, isPrivate: true },
     });
 
+    // 🔥 ACCESS LOGIC (CORRECT PLACE)
+    const approved = await (prisma as any).photoAccessRequest.findMany({
+      where: {
+        requesterId: viewerId,
+        ownerId: param,
+        status: "approved",
+      },
+      select: {
+        photoId: true,
+      },
+    });
+
+    const approvedSet = new Set(approved.map((a: any) => a.photoId));
+
+    const processedPhotos = photos.map((p) => ({
+      id: p.id,
+      url: p.url,
+      isPrivate: p.isPrivate && !approvedSet.has(p.id),
+    }));
+
     return res.json({
       id: user.id,
       name: user.name,
@@ -119,11 +137,7 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
       location: user.location,
       latitude: user.latitude,
       longitude: user.longitude,
-      photos: photos.map((p) => ({
-        id: p.id,
-        url: p.url,
-        isPrivate: p.isPrivate,
-      })),
+      photos: processedPhotos,
       prompts: user.prompts || {},
       verified: user.verified,
       verification_status: user.verification_status,
@@ -135,7 +149,7 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
 });
 
 /* =========================
-   UPDATE PROFILE (FIXED)
+   UPDATE PROFILE (UNCHANGED)
 ========================= */
 router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
   try {
@@ -188,7 +202,7 @@ router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
 });
 
 /* =========================
-   🔒 TOGGLE PHOTO PRIVACY (ADDED ONLY THIS)
+   TOGGLE PHOTO PRIVACY (UNCHANGED)
 ========================= */
 router.put("/photo/privacy", requireUser, async (req: AuthRequest, res: Response) => {
   try {

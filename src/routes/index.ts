@@ -109,8 +109,7 @@ router.use("/report", reportRoutes);
 router.use("/user/photos", photosRouter);
 
 /* 🔥 NEW: PRIVATE PHOTO REQUESTS (MOUNTED HERE) */
-router.use("/user/photo", photoRequestsRoutes);
-
+router.use("/photo-access", photoRequestsRoutes);
 router.use("/user/profile-completion", profileCompletionRoutes);
 router.use("/user/match-count", matchCountRoutes);
 router.use("/user/swipe-stats", statsRoutes);

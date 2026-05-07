@@ -194,4 +194,25 @@ router.get("/can-view/:photoId", requireUser, async (req: Request, res: Response
   }
 });
 
+router.get("/mine", requireUser, async (req, res) => {
+  try {
+    const userId = (req as any).user?.id;
+
+    const requests = await (prisma as any).photoAccessRequest.findMany({
+      where: {
+        requesterId: userId,
+      },
+      select: {
+        photoId: true,
+        status: true,
+      },
+    });
+
+    res.json(requests);
+  } catch (err) {
+    console.error("mine requests error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

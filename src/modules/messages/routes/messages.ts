@@ -186,17 +186,29 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     try {
-      const io = req.app.get("io");
+  const io = req.app.get("io");
 
-      if (io) {
-        io.to(receiverId).emit("message:new", message);
-        io.to(senderId).emit("message:new", message);
-        console.log("🔥 Socket message emitted:", message.id);
-      }
-    } catch (err) {
-      console.error("❌ Socket emit error:", err);
-    }
+  if (io) {
+    // 🔥 CONVERSATION ROOM (for chat UI)
+    const room = `conversation:${[senderId, receiverId].sort().join(":")}`;
 
+    io.to(room).emit("message:new", message);
+
+    // 🔔 USER ROOMS (for notifications)
+    io.to(`user:${receiverId}`).emit("notification:message", {
+      fromUserId: senderId,
+      messageId: message.id,
+    });
+
+    // optional: sender (for consistency)
+    io.to(`user:${senderId}`).emit("message:new", message);
+
+    console.log("🔥 Socket message emitted:", message.id);
+  }
+} catch (err) {
+  console.error("❌ Socket emit error:", err);
+}
+    
     try {
       const receiver = await prisma.user.findUnique({
         where: { id: receiverId },

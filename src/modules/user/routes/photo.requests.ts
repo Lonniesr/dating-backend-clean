@@ -132,15 +132,21 @@ router.get("/incoming", requireUser, async (req: Request, res: Response) => {
         status: "pending",
       },
       include: {
-        requester: {
-          select: {
-            id: true,
-            username: true,
-            name: true,
-          },
+  requester: {
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      photos: {
+        select: {
+          url: true,
         },
-        photo: true,
+        take: 1,
       },
+    },
+  },
+  photo: true,
+},
       orderBy: { createdAt: "desc" },
     });
 

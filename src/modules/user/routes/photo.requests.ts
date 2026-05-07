@@ -61,6 +61,12 @@ router.post("/request", requireUser, async (req: Request, res: Response) => {
       },
     });
 
+    // 🔥 REAL-TIME EMIT TO OWNER
+    const io = req.app.get("io");
+    io.to(`user:${photo.userId}`).emit("photo:request:new", {
+      photoId,
+    });
+
     return res.json(request);
   } catch (err) {
     console.error("photo request error:", err);
@@ -108,6 +114,21 @@ router.post("/respond", requireUser, async (req: Request, res: Response) => {
       data: { status },
     });
 
+    // 🔥 REAL-TIME EMIT TO REQUESTER
+    const io = req.app.get("io");
+
+    if (status === "approved") {
+      io.to(`user:${request.requesterId}`).emit("photo:request:approved", {
+        photoId: request.photoId,
+      });
+    }
+
+    if (status === "denied") {
+      io.to(`user:${request.requesterId}`).emit("photo:request:denied", {
+        photoId: request.photoId,
+      });
+    }
+
     return res.json(updated);
   } catch (err) {
     console.error("photo respond error:", err);
@@ -132,21 +153,21 @@ router.get("/incoming", requireUser, async (req: Request, res: Response) => {
         status: "pending",
       },
       include: {
-  requester: {
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      photos: {
-        select: {
-          url: true,
+        requester: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            photos: {
+              select: {
+                url: true,
+              },
+              take: 1,
+            },
+          },
         },
-        take: 1,
+        photo: true,
       },
-    },
-  },
-  photo: true,
-},
       orderBy: { createdAt: "desc" },
     });
 

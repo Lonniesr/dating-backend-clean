@@ -98,9 +98,35 @@ io.on("connection", (socket) => {
   console.log("⚡ Socket connected:", socket.id);
 
   socket.on("chat:join", (userId: string) => {
-    socket.join(userId);
-    console.log("👤 User joined room:", userId);
-  });
+  socket.data.userId = userId; // 🔥 STORE USER ID
+
+  socket.join(`user:${userId}`); // keep user room consistent
+
+  console.log("👤 User joined room:", userId);
+});
+
+/* =========================
+   🔥 CONVERSATION JOIN (CRITICAL FIX)
+========================= */
+
+socket.on("conversation:join", ({ otherUserId }) => {
+  try {
+    const userId = socket.data.userId; // ✅ THIS IS THE KEY
+
+    if (!userId || !otherUserId) {
+      console.log("❌ BAD conversation:join payload");
+      return;
+    }
+
+    const room = `conversation:${[userId, otherUserId].sort().join(":")}`;
+
+    socket.join(room);
+
+    console.log("👥 JOINED CONVERSATION ROOM:", room);
+  } catch (err) {
+    console.error("❌ conversation:join error:", err);
+  }
+});
 
   /* =========================
      🔥 TYPING EVENTS (ADDED ONLY THIS)

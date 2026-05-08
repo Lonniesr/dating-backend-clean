@@ -209,19 +209,23 @@ router.post("/:id", requireUser, async (req: any, res) => {
 }
     
     try {
-      const receiver = await prisma.user.findUnique({
-        where: { id: receiverId },
-        select: { pushToken: true },
-      });
+      
+   const receiver = await prisma.user.findUnique({
+  where: { id: receiverId },
+  select: { pushToken: true },
+});
 
-      if (receiver?.pushToken && !blocked) {
-        await sendPushNotification({
-          token: receiver.pushToken,
-          title: `${sender.name || "Someone"} sent you a message 💬`,
-          body: text || "New message",
-          data: { url: `/chat/${senderId}` },
-        });
-      }
+if (receiver?.pushToken) {
+  await sendPushNotification({
+    token: receiver.pushToken, // ✅ THIS is the correct token
+    title: "New message",
+    body: message.text || "Sent you a message",
+    data: {
+      senderId: String(senderId), // 🔥 REQUIRED FOR SUPPRESSION
+    },
+  });
+} 
+
     } catch (err) {
       console.error("❌ Push error:", err);
     }

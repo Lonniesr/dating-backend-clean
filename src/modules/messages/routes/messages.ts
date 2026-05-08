@@ -201,7 +201,6 @@ router.post("/:id", requireUser, async (req: any, res) => {
     });
 
     // optional: sender (for consistency)
-    io.to(`user:${senderId}`).emit("message:new", message);
 
     console.log("🔥 Socket message emitted:", message.id);
   }

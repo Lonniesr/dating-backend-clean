@@ -1,5 +1,6 @@
 import { Router } from "express";
-
+import { requireUser } from "../middleware/requireUser";
+import { updateLastActive } from "../middleware/updateLastActive";
 /* =========================
    USER ROUTES
 ========================= */
@@ -96,7 +97,7 @@ router.use("/auth", authRoutes);
 
 router.use("/onboarding", onboardingRoutes);
 
-router.use("/user", userRoutes);
+router.use("/user", requireUser, updateLastActive, userRoutes);
 router.use("/profile", profileRoutes);
 
 /* 🔥 NEW: UPDATE USER (password + profile) */

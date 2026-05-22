@@ -135,6 +135,7 @@ router.get("/", requireAdmin, async (req, res) => {
 
     const likeRate =
       totalCount > 0 ? (likedCount / totalCount) * 100 : 0;
+      const matchCount = await prisma.conversation.count();
 
     return res.json({
       swipes: formatted,
@@ -142,7 +143,7 @@ router.get("/", requireAdmin, async (req, res) => {
       analytics: {
         totalSwipes: totalCount,
         likedSwipes: likedCount,
-        matches: likedCount, // 🔥 ADD THIS LINE
+        matches: matchCount, // ✅ REAL DATA
         likeRate: Number(likeRate.toFixed(2)),
       },
     });

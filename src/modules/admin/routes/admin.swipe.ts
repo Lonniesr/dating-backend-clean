@@ -31,7 +31,7 @@ router.get("/", requireAdmin, async (req, res) => {
     if (liked === "true") where.liked = true;
     if (liked === "false") where.liked = false;
 
-    // 📦 Fetch swipes (FIXED)
+    // 📦 Fetch swipes
     const swipes = await prisma.swipe.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -72,7 +72,7 @@ router.get("/", requireAdmin, async (req, res) => {
       },
     });
 
-    // 🔄 Pagination logic
+    // 🔄 Pagination
     let nextCursor: string | null = null;
 
     if (swipes.length > take) {
@@ -80,7 +80,20 @@ router.get("/", requireAdmin, async (req, res) => {
       nextCursor = nextItem!.id;
     }
 
-    // 🔧 Normalize response (UPDATED WITH PHOTOS)
+    // 🔥 MATCH COUNT (NEW)
+    const matchCounts: Record<string, number> = {};
+
+    (swipes || []).forEach((s) => {
+      if (s.liked && s.swiper && s.target) {
+        matchCounts[s.swiper.id] =
+          (matchCounts[s.swiper.id] || 0) + 1;
+
+        matchCounts[s.target.id] =
+          (matchCounts[s.target.id] || 0) + 1;
+      }
+    });
+
+    // 🔧 Normalize response (WITH MATCHES + PHOTOS)
     const formatted = swipes.map((swipe) => ({
       id: swipe.id,
       liked: swipe.liked,
@@ -96,6 +109,7 @@ router.get("/", requireAdmin, async (req, res) => {
               "Unknown",
             email: swipe.swiper.email,
             photos: swipe.swiper.photos || [],
+            matches: matchCounts[swipe.swiper.id] || 0,
           }
         : null,
 
@@ -108,6 +122,7 @@ router.get("/", requireAdmin, async (req, res) => {
               "Unknown",
             email: swipe.target.email,
             photos: swipe.target.photos || [],
+            matches: matchCounts[swipe.target.id] || 0,
           }
         : null,
     }));

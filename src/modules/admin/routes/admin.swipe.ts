@@ -6,13 +6,6 @@ const router = Router();
 
 /**
  * GET /api/admin/swipe
- *
- * Query params:
- * - cursor: string (last swipe id)
- * - limit: number (default 50, max 100)
- * - from: ISO date
- * - to: ISO date
- * - liked: "true" | "false"
  */
 router.get("/", requireAdmin, async (req, res) => {
   try {
@@ -38,12 +31,11 @@ router.get("/", requireAdmin, async (req, res) => {
     if (liked === "true") where.liked = true;
     if (liked === "false") where.liked = false;
 
-    // 📦 Fetch swipes
+    // 📦 Fetch swipes (FIXED)
     const swipes = await prisma.swipe.findMany({
       where,
       orderBy: { createdAt: "desc" },
-
-      take: take + 1, // for next cursor detection
+      take: take + 1,
 
       ...(cursor && {
         skip: 1,
@@ -57,6 +49,11 @@ router.get("/", requireAdmin, async (req, res) => {
             username: true,
             name: true,
             email: true,
+            photos: {
+              select: {
+                url: true,
+              },
+            },
           },
         },
         target: {
@@ -65,6 +62,11 @@ router.get("/", requireAdmin, async (req, res) => {
             username: true,
             name: true,
             email: true,
+            photos: {
+              select: {
+                url: true,
+              },
+            },
           },
         },
       },
@@ -78,7 +80,7 @@ router.get("/", requireAdmin, async (req, res) => {
       nextCursor = nextItem!.id;
     }
 
-    // 🔧 Normalize response
+    // 🔧 Normalize response (UPDATED WITH PHOTOS)
     const formatted = swipes.map((swipe) => ({
       id: swipe.id,
       liked: swipe.liked,
@@ -93,6 +95,7 @@ router.get("/", requireAdmin, async (req, res) => {
               swipe.swiper.name ||
               "Unknown",
             email: swipe.swiper.email,
+            photos: swipe.swiper.photos || [],
           }
         : null,
 
@@ -104,11 +107,12 @@ router.get("/", requireAdmin, async (req, res) => {
               swipe.target.name ||
               "Unknown",
             email: swipe.target.email,
+            photos: swipe.target.photos || [],
           }
         : null,
     }));
 
-    // 📊 Analytics (based on current filter set)
+    // 📊 Analytics
     const totalCount = await prisma.swipe.count({ where });
     const likedCount = await prisma.swipe.count({
       where: { ...where, liked: true },

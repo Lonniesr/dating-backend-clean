@@ -49,6 +49,7 @@ router.get("/", requireAdmin, async (req, res) => {
             username: true,
             name: true,
             email: true,
+            lastActiveAt: true, // 👈 ADD THIS
             photos: {
               select: {
                 url: true,
@@ -62,6 +63,7 @@ router.get("/", requireAdmin, async (req, res) => {
             username: true,
             name: true,
             email: true,
+            lastActiveAt: true, // 👈 ADD THIS
             photos: {
               select: {
                 url: true,
@@ -156,6 +158,7 @@ conversations.forEach((c) => {
             photos: swipe.swiper.photos || [],
             matches: matchCounts[swipe.swiper.id] || 0,
             trending: trendingCounts[swipe.swiper.id] || 0,
+            lastActiveAt: swipe.swiper.lastActiveAt, // 👈 ADD
           }
         : null,
 
@@ -170,6 +173,7 @@ conversations.forEach((c) => {
             photos: swipe.target.photos || [],
             matches: matchCounts[swipe.target.id] || 0,
             trending: trendingCounts[swipe.target.id] || 0,
+            lastActiveAt: swipe.target.lastActiveAt,
           }
         : null,
     }));

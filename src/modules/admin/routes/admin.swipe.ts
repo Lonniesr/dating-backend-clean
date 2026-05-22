@@ -142,7 +142,7 @@ router.get("/", requireAdmin, async (req, res) => {
       analytics: {
         totalSwipes: totalCount,
         likedSwipes: likedCount,
-         matches: likedCount, // 🔥 ADD THIS LINE
+        matches: likedCount, // 🔥 ADD THIS LINE
         likeRate: Number(likeRate.toFixed(2)),
       },
     });

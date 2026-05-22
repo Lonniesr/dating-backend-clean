@@ -72,6 +72,14 @@ router.get("/", requireAdmin, async (req, res) => {
       },
     });
 
+    // 🔥 GET ALL UNIQUE USER IDS
+const userIds = new Set<string>();
+
+(swipes || []).forEach((s) => {
+  if (s.swiper?.id) userIds.add(s.swiper.id);
+  if (s.target?.id) userIds.add(s.target.id);
+});
+
     // 🔄 Pagination
     let nextCursor: string | null = null;
 
@@ -80,18 +88,26 @@ router.get("/", requireAdmin, async (req, res) => {
       nextCursor = nextItem!.id;
     }
 
-    // 🔥 MATCH COUNT (NEW)
-    const matchCounts: Record<string, number> = {};
+  // 🔥 REAL MATCH COUNTS (from conversations)
+const conversations = await prisma.conversation.findMany({
+  where: {
+    OR: [
+      { userAId: { in: Array.from(userIds) } },
+      { userBId: { in: Array.from(userIds) } },
+    ],
+  },
+  select: {
+    userAId: true,
+    userBId: true,
+  },
+});
 
-    (swipes || []).forEach((s) => {
-      if (s.liked && s.swiper && s.target) {
-        matchCounts[s.swiper.id] =
-          (matchCounts[s.swiper.id] || 0) + 1;
+const matchCounts: Record<string, number> = {};
 
-        matchCounts[s.target.id] =
-          (matchCounts[s.target.id] || 0) + 1;
-      }
-    });
+conversations.forEach((c) => {
+  matchCounts[c.userAId] = (matchCounts[c.userAId] || 0) + 1;
+  matchCounts[c.userBId] = (matchCounts[c.userBId] || 0) + 1;
+});
 
     // 🔧 Normalize response (WITH MATCHES + PHOTOS)
     const formatted = swipes.map((swipe) => ({

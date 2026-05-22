@@ -103,7 +103,36 @@ const conversations = await prisma.conversation.findMany({
 });
 
 const matchCounts: Record<string, number> = {};
+// 🔥 LAST 24H WINDOW
+const now = new Date();
+const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
+// 🔥 24H MATCHES (TRENDING)
+const recentConversations = await prisma.conversation.findMany({
+  where: {
+    createdAt: {
+      gte: last24h,
+    },
+    OR: [
+      { userAId: { in: Array.from(userIds) } },
+      { userBId: { in: Array.from(userIds) } },
+    ],
+  },
+  select: {
+    userAId: true,
+    userBId: true,
+  },
+});
+
+const trendingCounts: Record<string, number> = {};
+
+recentConversations.forEach((c) => {
+  trendingCounts[c.userAId] =
+    (trendingCounts[c.userAId] || 0) + 1;
+
+  trendingCounts[c.userBId] =
+    (trendingCounts[c.userBId] || 0) + 1;
+});
 conversations.forEach((c) => {
   matchCounts[c.userAId] = (matchCounts[c.userAId] || 0) + 1;
   matchCounts[c.userBId] = (matchCounts[c.userBId] || 0) + 1;
@@ -126,6 +155,7 @@ conversations.forEach((c) => {
             email: swipe.swiper.email,
             photos: swipe.swiper.photos || [],
             matches: matchCounts[swipe.swiper.id] || 0,
+            trending: trendingCounts[swipe.swiper.id] || 0,
           }
         : null,
 
@@ -139,6 +169,7 @@ conversations.forEach((c) => {
             email: swipe.target.email,
             photos: swipe.target.photos || [],
             matches: matchCounts[swipe.target.id] || 0,
+            trending: trendingCounts[swipe.target.id] || 0,
           }
         : null,
     }));

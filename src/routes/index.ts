@@ -63,6 +63,7 @@ import adminVerificationRoutes from "../modules/admin/routes/admin.verification"
 import adminMessagesRoutes from "../modules/admin/routes/admin.messages";
 import adminSettingsRoutes from "../modules/admin/routes/admin.settings";
 import analyticsRouter from "../modules/admin/routes/admin.analytics";
+import adminOnlineRoutes from "../modules/admin/routes/admin.online";
 
 /* 🔥 NEW: ADMIN SEARCH */
 import adminSearchRoutes from "../modules/admin/routes/admin.search";
@@ -182,6 +183,7 @@ router.use("/admin/search", adminSearchRoutes);
 router.use("/admin/messages", adminMessagesRoutes);
 router.use("/admin/settings", adminSettingsRoutes);
 router.use("/admin/analytics", analyticsRouter);
+router.use("/admin/online", adminOnlineRoutes);
 
 /* 🔥 FIX: ADMIN NOTIFICATIONS ROUTE (THIS WAS MISSING) */
 router.use("/admin/notifications", adminNotificationsRoutes);

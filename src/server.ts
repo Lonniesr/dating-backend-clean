@@ -16,7 +16,7 @@ import { updateLastActive } from "./middleware/updateLastActive";
 
 const app = express();
 const server = http.createServer(app);
-
+export const onlineUsers = new Set<string>();
 /* =========================
    🔥 PUBLIC FILES (CRITICAL FIX)
 ========================= */
@@ -61,7 +61,6 @@ app.use(
    APP LOGIC
 ========================= */
 
-app.use(updateLastActive);
 
 app.use("/api", apiRoutes);
 
@@ -97,14 +96,16 @@ app.set("io", io);
 io.on("connection", (socket) => {
   console.log("⚡ Socket connected:", socket.id);
 
-  socket.on("chat:join", (userId: string) => {
-  socket.data.userId = userId; // 🔥 STORE USER ID
+ socket.on("chat:join", (userId: string) => {
+  socket.data.userId = userId;
 
-  socket.join(`user:${userId}`); // keep user room consistent
+  socket.join(`user:${userId}`);
 
-  console.log("👤 User joined room:", userId);
-});
+  // 🟢 MARK ONLINE
+  onlineUsers.add(userId);
 
+  console.log("🟢 User ONLINE:", userId);
+}); 
 /* =========================
    🔥 CONVERSATION JOIN (CRITICAL FIX)
 ========================= */
@@ -141,8 +142,16 @@ socket.on("conversation:join", ({ otherUserId }) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("❌ Socket disconnected:", socket.id);
-  });
+  const userId = socket.data.userId;
+
+  if (userId) {
+    onlineUsers.delete(userId);
+
+    console.log("⚫ User OFFLINE:", userId);
+  }
+
+  console.log("❌ Socket disconnected:", socket.id);
+});
 });
 
 /* =========================

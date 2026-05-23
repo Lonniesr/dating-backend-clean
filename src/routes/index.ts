@@ -90,6 +90,8 @@ const router = Router();
 ========================= */
 
 router.use("/auth", authRoutes);
+router.use(requireUser);
+router.use(updateLastActive);
 
 /* =========================
    USER DOMAIN
@@ -97,7 +99,8 @@ router.use("/auth", authRoutes);
 
 router.use("/onboarding", onboardingRoutes);
 
-router.use("/user", requireUser, updateLastActive, userRoutes);
+router.use("/user", userRoutes);
+
 router.use("/profile", profileRoutes);
 
 /* 🔥 NEW: UPDATE USER (password + profile) */

@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { onlineUsers } from "../../../server";
-
+import { onlineUsers } from "../../../sockets/chat.socket";
 const router = Router();
 
 router.get("/", (_req, res) => {

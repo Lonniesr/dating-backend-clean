@@ -2,14 +2,14 @@ import { Server, Socket } from "socket.io";
 import prisma from "../prisma";
 import { socketAuth } from "../middleware/socketAuth";
 
+export const onlineUsers = new Set<string>();
+
 function getConversationRoom(a: string, b: string) {
   return `conversation:${[a, b].sort().join(":")}`;
 }
 
 export function registerChatSocket(io: Server) {
   io.use(socketAuth());
-
-  const onlineUsers = new Set<string>();
 
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
@@ -35,28 +35,28 @@ export function registerChatSocket(io: Server) {
     ========================= */
 
     socket.on("chat:join", (id: string) => {
-  if (!id) return;
+      if (!id) return;
 
-  socket.join(`user:${id}`);
+      socket.join(`user:${id}`);
 
-  socket.data.userId = id;
+      socket.data.userId = id;
 
-  console.log("👤 CHAT JOIN:", id);
+      console.log("👤 CHAT JOIN:", id);
 
-  // 🔥 broadcast online status
-  io.emit("presence:update", {
-    userId: id,
-    online: true,
-  });
+      // 🔥 broadcast online status
+      io.emit("presence:update", {
+        userId: id,
+        online: true,
+      });
 
-  // 🔥 sync all currently online users to THIS socket
-  onlineUsers.forEach((onlineId) => {
-    socket.emit("presence:update", {
-      userId: onlineId,
-      online: true,
+      // 🔥 sync all currently online users to THIS socket
+      onlineUsers.forEach((onlineId) => {
+        socket.emit("presence:update", {
+          userId: onlineId,
+          online: true,
+        });
+      });
     });
-  });
-});
 
     /* =========================
        JOIN CONVERSATION
@@ -150,7 +150,6 @@ export function registerChatSocket(io: Server) {
           });
 
           io.to(`user:${receiverId}`).emit("notifications:update");
-
         } catch (err) {
           console.error("CHAT MESSAGE ERROR:", err);
         }

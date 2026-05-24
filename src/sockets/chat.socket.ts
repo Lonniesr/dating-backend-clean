@@ -35,9 +35,28 @@ export function registerChatSocket(io: Server) {
     ========================= */
 
     socket.on("chat:join", (id: string) => {
-      if (!id) return;
-      socket.join(`user:${id}`);
+  if (!id) return;
+
+  socket.join(`user:${id}`);
+
+  socket.data.userId = id;
+
+  console.log("👤 CHAT JOIN:", id);
+
+  // 🔥 broadcast online status
+  io.emit("presence:update", {
+    userId: id,
+    online: true,
+  });
+
+  // 🔥 sync all currently online users to THIS socket
+  onlineUsers.forEach((onlineId) => {
+    socket.emit("presence:update", {
+      userId: onlineId,
+      online: true,
     });
+  });
+});
 
     /* =========================
        JOIN CONVERSATION

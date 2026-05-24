@@ -22,7 +22,7 @@ export function registerChatSocket(io: Server) {
     console.log("💬 Chat connected:", userId);
 
     onlineUsers.add(userId);
-
+    console.log("🟢 ONLINE USERS:", Array.from(onlineUsers));
     socket.join(`user:${userId}`);
 
     io.emit("presence:update", {

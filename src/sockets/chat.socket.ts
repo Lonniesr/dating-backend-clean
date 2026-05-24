@@ -14,6 +14,8 @@ export function registerChatSocket(io: Server) {
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
+    console.log("🔥 SOCKET DATA:", socket.data);
+
     if (!userId) {
       socket.disconnect();
       return;

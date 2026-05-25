@@ -5,7 +5,7 @@ const router = Router();
 
 /**
  * GET /api/invite/:code
- * Public invite validation + scan tracking
+ * Public invite validation
  */
 router.get(
   "/:code",
@@ -60,61 +60,55 @@ router.get(
       if (/tablet/i.test(userAgent)) device = "tablet";
 
       /* =========================
-         TRACK SCAN
+         TEMPORARILY DISABLED
+         INVITE ANALYTICS
       ========================= */
 
-      await prisma.inviteScan.create({
-        data: {
-          inviteId: invite.id,
-          device,
-          browser: null,
-          os: null,
-          ip: ipAddress || null,
-        },
-      });
+      // await prisma.inviteScan.create({
+      //   data: {
+      //     inviteId: invite.id,
+      //     device,
+      //     browser: null,
+      //     os: null,
+      //     ip: ipAddress || null,
+      //   },
+      // });
 
-      /* =========================
-         INCREMENT SCAN COUNTER
-      ========================= */
-
-      const updatedInvite = await prisma.invite.update({
-        where: { id: invite.id },
-        data: {
-          scanCount: { increment: 1 },
-        },
-      });
+      // await prisma.invite.update({
+      //   where: { id: invite.id },
+      //   data: {
+      //     scanCount: { increment: 1 },
+      //   },
+      // });
 
       /* =========================
          VALIDATION
       ========================= */
 
-      if (updatedInvite.used) {
+      if (invite.used) {
         return res.status(400).json({
           reason: "used",
           message: "Invite already used",
-          scanCount: updatedInvite.scanCount,
         });
       }
 
       if (
-        updatedInvite.expiresAt &&
-        updatedInvite.expiresAt < new Date()
+        invite.expiresAt &&
+        invite.expiresAt < new Date()
       ) {
         return res.status(410).json({
           reason: "expired",
           message: "Invite expired",
-          expiresAt: updatedInvite.expiresAt,
-          scanCount: updatedInvite.scanCount,
+          expiresAt: invite.expiresAt,
         });
       }
 
       return res.json({
         valid: true,
-        code: updatedInvite.code,
-        premium: updatedInvite.premium,
-        expiresAt: updatedInvite.expiresAt,
-        used: updatedInvite.used,
-        scanCount: updatedInvite.scanCount,
+        code: invite.code,
+        premium: invite.premium,
+        expiresAt: invite.expiresAt,
+        used: invite.used,
       });
 
     } catch (error) {

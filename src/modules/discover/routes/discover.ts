@@ -299,16 +299,20 @@ router.get(
       const windowed = finalFeed.slice(cursor, cursor + BUFFER_SIZE);
 
       const profiles = windowed.slice(0, PAGE_SIZE).map((u) => ({
-        id: u.id,
-        name: u.name,
-        gender: u.gender,
-        race: u.race,
-        birthdate: u.birthdate,
-        location: u.location,
-        latitude: u.latitude,
-        longitude: u.longitude,
-        photos: (u.photos ?? []).map((p: { url: string }) => p.url),
-      }));
+  id: u.id,
+  name: u.name,
+  gender: u.gender,
+  race: u.race,
+  birthdate: u.birthdate,
+  location: u.location,
+  latitude: u.latitude,
+  longitude: u.longitude,
+
+  // 🔥 ONLINE STATUS
+  lastActiveAt: u.lastActiveAt,
+
+  photos: (u.photos ?? []).map((p: { url: string }) => p.url),
+}));
 
       const response = {
         profiles,

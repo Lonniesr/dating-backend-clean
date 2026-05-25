@@ -1,11 +1,24 @@
 import { Router } from "express";
-import { onlineUsers } from "../../../sockets/chat.socket";
+import prisma from "../../../prisma";
+
 const router = Router();
 
-router.get("/", (_req, res) => {
-    console.log("📡 ADMIN ONLINE ROUTE:", Array.from(onlineUsers));
+router.get("/", async (_req, res) => {
+  const twoMinutesAgo = new Date(Date.now() - 120000);
+
+  const onlineUsers = await prisma.user.findMany({
+    where: {
+      lastActiveAt: {
+        gte: twoMinutesAgo,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
   res.json({
-    online: Array.from(onlineUsers),
+    online: onlineUsers.map((u) => u.id),
   });
 });
 

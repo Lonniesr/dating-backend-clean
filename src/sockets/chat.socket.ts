@@ -2,8 +2,6 @@ import { Server, Socket } from "socket.io";
 import prisma from "../prisma";
 import { socketAuth } from "../middleware/socketAuth";
 
-export const onlineUsers = new Set<string>();
-
 function getConversationRoom(a: string, b: string) {
   return `conversation:${[a, b].sort().join(":")}`;
 }
@@ -23,8 +21,14 @@ export function registerChatSocket(io: Server) {
 
     console.log("💬 Chat connected:", userId);
 
-    onlineUsers.add(userId);
-    console.log("🟢 ONLINE USERS:", Array.from(onlineUsers));
+    // 🔥 UPDATE LAST ACTIVE
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        lastActiveAt: new Date(),
+      },
+    });
+
     socket.join(`user:${userId}`);
 
     io.emit("presence:update", {
@@ -32,11 +36,13 @@ export function registerChatSocket(io: Server) {
       online: true,
     });
 
+    console.log("📡 EMITTING PRESENCE:", userId);
+
     /* =========================
        JOIN USER ROOM
     ========================= */
 
-    socket.on("chat:join", (id: string) => {
+    socket.on("chat:join", async (id: string) => {
       if (!id) return;
 
       socket.join(`user:${id}`);
@@ -45,18 +51,17 @@ export function registerChatSocket(io: Server) {
 
       console.log("👤 CHAT JOIN:", id);
 
-      // 🔥 broadcast online status
+      // 🔥 UPDATE LAST ACTIVE
+      await prisma.user.update({
+        where: { id },
+        data: {
+          lastActiveAt: new Date(),
+        },
+      });
+
       io.emit("presence:update", {
         userId: id,
         online: true,
-      });
-
-      // 🔥 sync all currently online users to THIS socket
-      onlineUsers.forEach((onlineId) => {
-        socket.emit("presence:update", {
-          userId: onlineId,
-          online: true,
-        });
       });
     });
 
@@ -73,7 +78,6 @@ export function registerChatSocket(io: Server) {
 
       console.log("👥 JOIN:", userId, "→", room);
 
-      // 🔥 DEBUG: how many users are in this room RIGHT NOW
       const clients = io.sockets.adapter.rooms.get(room);
 
       console.log(
@@ -86,7 +90,7 @@ export function registerChatSocket(io: Server) {
     });
 
     /* =========================
-       SEND MESSAGE (FIXED)
+       SEND MESSAGE
     ========================= */
 
     socket.on(
@@ -95,6 +99,14 @@ export function registerChatSocket(io: Server) {
         if (!receiverId || !text) return;
 
         try {
+          // 🔥 UPDATE LAST ACTIVE
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              lastActiveAt: new Date(),
+            },
+          });
+
           const match = await prisma.match.findFirst({
             where: {
               OR: [
@@ -162,8 +174,16 @@ export function registerChatSocket(io: Server) {
        TYPING
     ========================= */
 
-    socket.on("typing:start", (payload: any) => {
+    socket.on("typing:start", async (payload: any) => {
       if (!payload?.to) return;
+
+      // 🔥 UPDATE LAST ACTIVE
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastActiveAt: new Date(),
+        },
+      });
 
       const room = getConversationRoom(userId, payload.to);
 
@@ -191,6 +211,14 @@ export function registerChatSocket(io: Server) {
     socket.on("message:read", async ({ otherUserId }) => {
       if (!otherUserId) return;
 
+      // 🔥 UPDATE LAST ACTIVE
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          lastActiveAt: new Date(),
+        },
+      });
+
       await prisma.message.updateMany({
         where: {
           senderId: otherUserId,
@@ -215,8 +243,6 @@ export function registerChatSocket(io: Server) {
 
     socket.on("disconnect", () => {
       console.log("💬 Chat disconnected:", userId);
-
-      onlineUsers.delete(userId);
 
       io.emit("presence:update", {
         userId,

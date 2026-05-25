@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireUser } from "../middleware/requireUser";
 import { updateLastActive } from "../middleware/updateLastActive";
+
 /* =========================
    USER ROUTES
 ========================= */
@@ -91,6 +92,19 @@ const router = Router();
 ========================= */
 
 router.use("/auth", authRoutes);
+
+/* =========================
+   🔥 PUBLIC INVITE ROUTES
+   MUST STAY ABOVE AUTH
+========================= */
+
+router.use("/invite", inviteRoutes);
+router.use("/invite", publicInviteRoutes);
+
+/* =========================
+   AUTH PROTECTION
+========================= */
+
 router.use(requireUser);
 router.use(updateLastActive);
 
@@ -128,13 +142,6 @@ router.use("/notifications", notificationsRoutes);
 
 router.use("/user/verify", verificationRoutes);
 router.use("/user/selfie-verification", selfieVerificationRoutes);
-
-/* =========================
-   INVITE SYSTEM
-========================= */
-
-router.use("/invite", inviteRoutes);
-router.use("/invite", publicInviteRoutes);
 
 /* =========================
    MATCHING DOMAIN

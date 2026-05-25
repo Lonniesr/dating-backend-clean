@@ -17,7 +17,10 @@ router.get(
       const code = req.params.code;
 
       if (!code) {
-        return res.status(400).json({ error: "Invite code required" });
+        return res.status(400).json({
+          reason: "not_found",
+          message: "Invite code required",
+        });
       }
 
       const invite = await prisma.invite.findUnique({
@@ -25,7 +28,10 @@ router.get(
       });
 
       if (!invite) {
-        return res.status(404).json({ error: "Invite not found" });
+        return res.status(404).json({
+          reason: "not_found",
+          message: "Invite not found",
+        });
       }
 
       /* =========================
@@ -33,6 +39,7 @@ router.get(
       ========================= */
 
       const userAgentHeader = req.headers["user-agent"];
+
       const userAgent =
         typeof userAgentHeader === "string"
           ? userAgentHeader
@@ -83,7 +90,8 @@ router.get(
 
       if (updatedInvite.used) {
         return res.status(400).json({
-          error: "Invite already used",
+          reason: "used",
+          message: "Invite already used",
           scanCount: updatedInvite.scanCount,
         });
       }
@@ -93,7 +101,8 @@ router.get(
         updatedInvite.expiresAt < new Date()
       ) {
         return res.status(410).json({
-          error: "Invite expired",
+          reason: "expired",
+          message: "Invite expired",
           expiresAt: updatedInvite.expiresAt,
           scanCount: updatedInvite.scanCount,
         });
@@ -110,8 +119,10 @@ router.get(
 
     } catch (error) {
       console.error("Public invite lookup error:", error);
+
       return res.status(500).json({
-        error: "Failed to validate invite",
+        reason: "server_error",
+        message: "Failed to validate invite",
       });
     }
   }

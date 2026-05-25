@@ -60,26 +60,33 @@ router.get(
       if (/tablet/i.test(userAgent)) device = "tablet";
 
       /* =========================
-         TEMPORARILY DISABLED
-         INVITE ANALYTICS
+         TRACK SCAN (SAFE)
       ========================= */
 
-      // await prisma.inviteScan.create({
-      //   data: {
-      //     inviteId: invite.id,
-      //     device,
-      //     browser: null,
-      //     os: null,
-      //     ip: ipAddress || null,
-      //   },
-      // });
+      try {
+        await prisma.inviteScan.create({
+          data: {
+            inviteId: invite.id,
+            device,
+            browser: null,
+            os: null,
+            ip: ipAddress || null,
+          },
+        });
 
-      // await prisma.invite.update({
-      //   where: { id: invite.id },
-      //   data: {
-      //     scanCount: { increment: 1 },
-      //   },
-      // });
+        await prisma.invite.update({
+          where: { id: invite.id },
+          data: {
+            scanCount: { increment: 1 },
+          },
+        });
+
+      } catch (analyticsError) {
+        console.error(
+          "Invite analytics failed:",
+          analyticsError
+        );
+      }
 
       /* =========================
          VALIDATION

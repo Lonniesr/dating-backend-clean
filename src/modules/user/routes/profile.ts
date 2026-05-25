@@ -127,21 +127,24 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
     }));
 
     return res.json({
-      id: user.id,
-      name: user.name,
-      username: user.username,
-      age: user.age,
-      gender: user.gender,
-      race: user.race,
-      bio: user.bio,
-      location: user.location,
-      latitude: user.latitude,
-      longitude: user.longitude,
-      photos: processedPhotos,
-      prompts: user.prompts || {},
-      verified: user.verified,
-      verification_status: user.verification_status,
-    });
+  id: user.id,
+  name: user.name,
+  username: user.username,
+  age: user.age,
+  gender: user.gender,
+  race: user.race,
+  bio: user.bio,
+  location: user.location,
+  latitude: user.latitude,
+  longitude: user.longitude,
+  photos: processedPhotos,
+  prompts: user.prompts || {},
+  verified: user.verified,
+  verification_status: user.verification_status,
+
+  // 🔥 ONLINE STATUS
+  lastActiveAt: user.lastActiveAt,
+});
   } catch (err) {
     console.error("PROFILE BY ID ERROR:", err);
     return res.status(500).json({ error: "Server error" });

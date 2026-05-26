@@ -193,7 +193,10 @@ router.post("/:id", requireUser, async (req: any, res) => {
     // 🔥 CONVERSATION ROOM (for chat UI)
     const room = `conversation:${[senderId, receiverId].sort().join(":")}`;
 
-    io.to(room).emit("message:new", message);
+    io.to(`user:${receiverId}`).emit(
+  "message:new",
+  message
+);
 
     // 🔔 USER ROOMS (for notifications)
     io.to(`user:${receiverId}`).emit("notification:message", {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 import { sendPushNotification } from "../../../services/push";
+import { activeChats } from "../../../server";
 
 const router = Router();
 
@@ -208,27 +209,68 @@ router.post("/:id", requireUser, async (req: any, res) => {
   console.error("❌ Socket emit error:", err);
 }
     
-    try {
-      
-   const receiver = await prisma.user.findUnique({
-  where: { id: receiverId },
-  select: { pushToken: true },
-});
+  try {
 
-if (receiver?.pushToken) {
-  await sendPushNotification({
-    token: receiver.pushToken, // ✅ THIS is the correct token
-    title: "New message",
-    body: message.text || "Sent you a message",
-    data: {
-      senderId: String(senderId), // 🔥 REQUIRED FOR SUPPRESSION
-    },
-  });
-} 
+  const activeChatUserId =
+    activeChats.get(receiverId);
 
-    } catch (err) {
-      console.error("❌ Push error:", err);
+  const suppressPush =
+    activeChatUserId &&
+    activeChatUserId === senderId;
+
+  console.log(
+    "📱 RECEIVER ACTIVE CHAT:",
+    activeChatUserId
+  );
+
+  console.log(
+    "👤 SENDER:",
+    senderId
+  );
+
+  console.log(
+    "🔕 SUPPRESS PUSH:",
+    suppressPush
+  );
+
+  if (!suppressPush) {
+
+    const receiver = await prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { pushToken: true },
+    });
+
+    if (receiver?.pushToken) {
+
+      await sendPushNotification({
+        token: receiver.pushToken,
+
+        title: "New message",
+
+        body: message.text || "Sent you a message",
+
+        data: {
+          senderId: String(senderId),
+        },
+      });
+
+      console.log("🔔 Push sent");
+
     }
+
+  } else {
+
+    console.log(
+      "🔕 Push suppressed (active chat)"
+    );
+
+  }
+
+} catch (err) {
+
+  console.error("❌ Push error:", err);
+
+}
 
     return res.json(message);
 

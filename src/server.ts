@@ -129,19 +129,49 @@ socket.on("conversation:join", ({ otherUserId }) => {
   }
 });
 
-  /* =========================
-     🔥 TYPING EVENTS (ADDED ONLY THIS)
-  ========================= */
+ /* =========================
+   🔥 TYPING EVENTS
+========================= */
 
-  socket.on("typing:start", ({ to }) => {
-    socket.to(to).emit("typing:start");
-  });
+socket.on("typing:start", ({ to }) => {
+  try {
+    const fromUserId = socket.data.userId;
 
-  socket.on("typing:stop", ({ to }) => {
-    socket.to(to).emit("typing:stop");
-  });
+    if (!fromUserId || !to) return;
 
-  socket.on("disconnect", () => {
+    const room = `conversation:${[fromUserId, to]
+      .sort()
+      .join(":")}`;
+
+    io.to(room).emit("typing:start", {
+      fromUserId,
+    });
+
+  } catch (err) {
+    console.error("❌ typing:start error:", err);
+  }
+});
+
+socket.on("typing:stop", ({ to }) => {
+  try {
+    const fromUserId = socket.data.userId;
+
+    if (!fromUserId || !to) return;
+
+    const room = `conversation:${[fromUserId, to]
+      .sort()
+      .join(":")}`;
+
+    io.to(room).emit("typing:stop", {
+      fromUserId,
+    });
+
+  } catch (err) {
+    console.error("❌ typing:stop error:", err);
+  }
+});
+
+socket.on("disconnect", () => {
   const userId = socket.data.userId;
 
   if (userId) {

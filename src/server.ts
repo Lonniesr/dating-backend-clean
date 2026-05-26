@@ -123,8 +123,16 @@ socket.on("conversation:join", ({ otherUserId }) => {
     const room = `conversation:${[userId, otherUserId].sort().join(":")}`;
 
     socket.join(room);
+    socket.data.activeChatUserId = otherUserId;
+
     activeChats.set(userId, otherUserId);
 
+    console.log("💬 ACTIVE CHAT:",
+  userId,
+  "→",
+  otherUserId
+  
+);
     console.log("👥 JOINED CONVERSATION ROOM:", room);
   } catch (err) {
     console.error("❌ conversation:join error:", err);
@@ -178,7 +186,16 @@ socket.on("disconnect", () => {
 
   if (userId) {
     onlineUsers.delete(userId);
-    activeChats.delete(userId);
+    const activeChatUserId = socket.data.activeChatUserId;
+
+  if (activeChatUserId) {
+  activeChats.delete(userId);
+
+  console.log(
+    "🧹 ACTIVE CHAT CLEARED:",
+    userId
+  );
+}
     console.log("⚫ User OFFLINE:", userId);
   }
 

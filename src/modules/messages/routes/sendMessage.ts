@@ -84,10 +84,27 @@ export default async function sendMessage(
 
 try {
 
-  const activeChat = activeChats.get(receiverId);
+  const activeChatUserId =
+  activeChats.get(receiverId);
 
-  // 🚫 SUPPRESS if recipient already viewing this chat
-  const suppressPush = activeChat === senderId;
+const suppressPush =
+  activeChatUserId &&
+  activeChatUserId === senderId;
+
+console.log(
+  "📱 RECEIVER ACTIVE CHAT:",
+  activeChatUserId
+);
+
+console.log(
+  "👤 SENDER:",
+  senderId
+);
+
+console.log(
+  "🔕 SUPPRESS PUSH:",
+  suppressPush
+);
 
   if (!suppressPush) {
 

@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "../../../prisma";
+import { activeChats } from "../../../server";
+import { sendPushNotification } from "../../../services/push";
 
 async function resolveConversation(userId: string, id: string) {
 
@@ -75,6 +77,69 @@ export default async function sendMessage(
         lastMessageId: message.id,
       },
     });
+
+    /* =========================
+   🔔 PUSH NOTIFICATION
+========================= */
+
+try {
+
+  const activeChat = activeChats.get(receiverId);
+
+  // 🚫 SUPPRESS if recipient already viewing this chat
+  const suppressPush = activeChat === senderId;
+
+  if (!suppressPush) {
+
+    const receiver = await prisma.user.findUnique({
+      where: { id: receiverId },
+      select: {
+        pushToken: true,
+        name: true,
+      },
+    });
+
+    const sender = await prisma.user.findUnique({
+      where: { id: senderId },
+      select: {
+        name: true,
+      },
+    });
+
+    if (receiver?.pushToken) {
+
+      await sendPushNotification({
+        token: receiver.pushToken,
+
+        title: sender?.name || "New message",
+
+        body: text.trim(),
+
+        data: {
+          type: "chat",
+          userId: senderId,
+        },
+      });
+
+      console.log("🔔 Push notification sent");
+
+    } else {
+
+      console.log("⚠️ No push token");
+
+    }
+
+  } else {
+
+    console.log("🔕 Push suppressed (active chat)");
+
+  }
+
+} catch (err) {
+
+  console.error("❌ PUSH ERROR:", err);
+
+}
 
     return res.json(message);
 

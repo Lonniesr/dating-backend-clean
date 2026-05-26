@@ -17,6 +17,7 @@ import { updateLastActive } from "./middleware/updateLastActive";
 const app = express();
 const server = http.createServer(app);
 export const onlineUsers = new Set<string>();
+export const activeChats = new Map<string, string>();
 /* =========================
    🔥 PUBLIC FILES (CRITICAL FIX)
 ========================= */
@@ -122,6 +123,7 @@ socket.on("conversation:join", ({ otherUserId }) => {
     const room = `conversation:${[userId, otherUserId].sort().join(":")}`;
 
     socket.join(room);
+    activeChats.set(userId, otherUserId);
 
     console.log("👥 JOINED CONVERSATION ROOM:", room);
   } catch (err) {
@@ -176,7 +178,7 @@ socket.on("disconnect", () => {
 
   if (userId) {
     onlineUsers.delete(userId);
-
+    activeChats.delete(userId);
     console.log("⚫ User OFFLINE:", userId);
   }
 

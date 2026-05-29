@@ -96,6 +96,12 @@ export function registerChatSocket(io: Server) {
     socket.on(
       "message:send",
       async ({ receiverId, text }: { receiverId: string; text: string }) => {
+       console.log("🚨 SOCKET MESSAGE:send HIT", {
+  userId,
+  receiverId,
+  text,
+});
+        
         if (!receiverId || !text) return;
 
         try {

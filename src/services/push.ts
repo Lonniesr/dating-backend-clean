@@ -13,28 +13,30 @@ if (!admin.apps.length) {
 }
 
 /* =========================
-   SEND PUSH (UPDATED)
+   SEND PUSH (DATA ONLY TEST)
 ========================= */
 
 export async function sendPushNotification({
   token,
   title,
   body,
-  data, // 🔥 NEW
+  data,
 }: {
   token: string;
   title: string;
   body: string;
-  data?: Record<string, string>; // 🔥 NEW
+  data?: Record<string, string>;
 }) {
   try {
     await admin.messaging().send({
       token,
-      notification: {
+
+      // 🔥 DATA ONLY
+      data: {
         title,
         body,
+        ...(data || {}),
       },
-      data, // 🔥 THIS ENABLES DEEP LINKING
     });
 
     console.log("🔥 Push sent");

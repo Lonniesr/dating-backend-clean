@@ -243,6 +243,53 @@ export function registerChatSocket(io: Server) {
       io.to(`user:${otherUserId}`).emit("notifications:update");
     });
 
+/* =========================
+   MESSAGE REACTIONS
+========================= */
+
+socket.on(
+  "message:reaction",
+  async ({
+    messageId,
+    emoji,
+    otherUserId,
+  }) => {
+    if (!messageId || !emoji || !otherUserId) {
+      return;
+    }
+
+    try {
+      await prisma.message.update({
+        where: {
+          id: messageId,
+        },
+        data: {
+          reaction: emoji,
+        },
+      });
+
+      const room = getConversationRoom(
+        userId,
+        otherUserId
+      );
+
+      io.to(room).emit(
+        "message:reaction:update",
+        {
+          messageId,
+          emoji,
+        }
+      );
+
+    } catch (err) {
+      console.error(
+        "REACTION ERROR:",
+        err
+      );
+    }
+  }
+);
+
     /* =========================
        DISCONNECT
     ========================= */

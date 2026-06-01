@@ -273,6 +273,8 @@ model Message {
   imageUrl String?
   audioUrl String?
 
+  reaction String?
+
   replyToId String?
 
   read Boolean @default(false)

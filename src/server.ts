@@ -180,7 +180,55 @@ socket.on("typing:stop", ({ to }) => {
     console.error("❌ typing:stop error:", err);
   }
 });
+/* =========================
+   🔥 MESSAGE REACTIONS
+========================= */
 
+socket.on(
+  "message:reaction",
+  async ({
+    messageId,
+    emoji,
+    otherUserId,
+  }) => {
+    console.log("🔥 REACTION RECEIVED", {
+      messageId,
+      emoji,
+      otherUserId,
+    });
+
+    if (!messageId || !emoji || !otherUserId) {
+      return;
+    }
+
+    try {
+      const room = `conversation:${[
+        socket.data.userId,
+        otherUserId,
+      ]
+        .sort()
+        .join(":")}`;
+
+      io.to(room).emit(
+        "message:reaction:update",
+        {
+          messageId,
+          emoji,
+        }
+      );
+
+      console.log(
+        "✅ REACTION BROADCAST",
+        room
+      );
+    } catch (err) {
+      console.error(
+        "❌ REACTION ERROR:",
+        err
+      );
+    }
+  }
+);
 socket.on("disconnect", () => {
   const userId = socket.data.userId;
 

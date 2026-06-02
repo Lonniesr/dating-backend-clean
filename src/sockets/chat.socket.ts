@@ -1,4 +1,5 @@
 import { Server, Socket } from "socket.io";
+console.log("🚨 BACKEND VERSION 131175a");
 import prisma from "../prisma";
 import { socketAuth } from "../middleware/socketAuth";
 

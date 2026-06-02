@@ -247,6 +247,10 @@ export function registerChatSocket(io: Server) {
    MESSAGE REACTIONS
 ========================= */
 
+/* =========================
+   MESSAGE REACTIONS
+========================= */
+
 socket.on(
   "message:reaction",
   async ({
@@ -254,6 +258,13 @@ socket.on(
     emoji,
     otherUserId,
   }) => {
+  console.log("🔥 REACTION RECEIVED", {
+      from: userId,
+      messageId,
+      emoji,
+      otherUserId,
+    });
+
     if (!messageId || !emoji || !otherUserId) {
       return;
     }
@@ -289,6 +300,7 @@ socket.on(
     }
   }
 );
+ 
 
     /* =========================
        DISCONNECT

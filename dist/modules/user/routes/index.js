@@ -5,9 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const requireUser_1 = require("../../../middleware/requireUser");
+const prisma_1 = __importDefault(require("../../../prisma"));
 // Controllers
 const updateProfile_1 = __importDefault(require("./updateProfile"));
-const editProfile_1 = __importDefault(require("./editProfile"));
 const deletePhoto_1 = __importDefault(require("./deletePhoto"));
 const reorderPhotos_1 = __importDefault(require("./reorderPhotos"));
 const swipeStats_1 = __importDefault(require("../../swipe/routes/swipeStats"));
@@ -16,12 +16,59 @@ const profileCompletion_1 = __importDefault(require("./profileCompletion"));
 const getMatches_1 = __importDefault(require("./getMatches"));
 const router = (0, express_1.Router)();
 /**
- * PROFILE
+ * USERNAME CHECK
  */
-router.get("/edit", requireUser_1.requireUser, editProfile_1.default);
-/* Allow both routes so frontend works */
+router.get("/check-username", async (req, res) => {
+    try {
+        const username = String(req.query.username || "").toLowerCase();
+        if (!username || username.length < 3) {
+            return res.json({ available: false });
+        }
+        const existing = await prisma_1.default.user.findFirst({
+            where: { username },
+            select: { id: true },
+        });
+        res.json({
+            available: !existing,
+        });
+    }
+    catch (err) {
+        console.error("USERNAME CHECK ERROR:", err);
+        res.status(500).json({
+            available: false,
+        });
+    }
+});
+/**
+ * 🔥 SAVE PUSH TOKEN (NEW)
+ */
+router.post("/push-token", requireUser_1.requireUser, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { token } = req.body;
+        if (!token) {
+            return res.status(400).json({
+                error: "No token provided",
+            });
+        }
+        await prisma_1.default.user.update({
+            where: { id: userId },
+            data: { pushToken: token },
+        });
+        console.log("🔥 Saved push token:", token);
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error("Push token save error:", err);
+        res.status(500).json({
+            error: "Failed to save push token",
+        });
+    }
+});
+/**
+ * PROFILE (ONLY ONE ROUTE)
+ */
 router.put("/profile", requireUser_1.requireUser, updateProfile_1.default);
-router.put("/update", requireUser_1.requireUser, updateProfile_1.default);
 /**
  * PHOTOS
  */

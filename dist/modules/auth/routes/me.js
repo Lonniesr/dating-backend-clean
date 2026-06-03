@@ -11,7 +11,7 @@ const router = (0, express_1.Router)();
  * GET /api/auth/me
  * Returns authenticated user's full onboarding state
  */
-router.get("/", requireUser_1.requireUser, async (req, res) => {
+router.get("/me", requireUser_1.requireUser, async (req, res) => {
     try {
         const user = await prisma_1.default.user.findUnique({
             where: { id: req.user.id },

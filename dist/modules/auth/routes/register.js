@@ -5,7 +5,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../../../prisma"));
+const env_1 = require("../../../config/env");
 const router = (0, express_1.Router)();
 router.post("/", async (req, res) => {
     var _a;
@@ -21,7 +23,6 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ error: "Email already in use" });
         }
         let invite = null;
-        // 🔥 Validate invite if provided
         if (inviteCode) {
             invite = await prisma_1.default.invite.findUnique({
                 where: { code: inviteCode },
@@ -51,7 +52,6 @@ router.post("/", async (req, res) => {
                 createdAt: true,
             },
         });
-        // 🔥 If invite used → update analytics
         if (invite) {
             await prisma_1.default.invite.update({
                 where: { id: invite.id },
@@ -63,6 +63,20 @@ router.post("/", async (req, res) => {
                 },
             });
         }
+        /**
+         * Create JWT session
+         */
+        const token = jsonwebtoken_1.default.sign({ id: user.id, role: user.role }, env_1.env.JWT_SECRET, { expiresIn: "30d" });
+        /**
+         * Set auth cookie
+         */
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: env_1.env.NODE_ENV === "production",
+            sameSite: env_1.env.NODE_ENV === "production" ? "none" : "lax",
+            path: "/",
+            maxAge: 1000 * 60 * 60 * 24 * 30,
+        });
         return res.status(201).json({ user });
     }
     catch (err) {

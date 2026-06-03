@@ -14,6 +14,25 @@ router.get("/", requireAdmin_1.requireAdmin, async (_req, res) => {
     try {
         const matches = await prisma_1.default.match.findMany({
             orderBy: { createdAt: "desc" },
+            // ✅ THIS IS THE FIX
+            include: {
+                userA: {
+                    select: {
+                        id: true,
+                        email: true,
+                        username: true,
+                        name: true,
+                    },
+                },
+                userB: {
+                    select: {
+                        id: true,
+                        email: true,
+                        username: true,
+                        name: true,
+                    },
+                },
+            },
         });
         res.json({ matches });
     }

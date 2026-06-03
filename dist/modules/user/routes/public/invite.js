@@ -8,19 +8,25 @@ const prisma_1 = __importDefault(require("../../../../prisma"));
 const router = (0, express_1.Router)();
 /**
  * GET /api/invite/:code
- * Public invite validation + scan tracking
+ * Public invite validation
  */
 router.get("/:code", async (req, res) => {
     try {
         const code = req.params.code;
         if (!code) {
-            return res.status(400).json({ error: "Invite code required" });
+            return res.status(400).json({
+                reason: "not_found",
+                message: "Invite code required",
+            });
         }
         const invite = await prisma_1.default.invite.findUnique({
             where: { code },
         });
         if (!invite) {
-            return res.status(404).json({ error: "Invite not found" });
+            return res.status(404).json({
+                reason: "not_found",
+                message: "Invite not found",
+            });
         }
         /* =========================
            SAFE STRING NORMALIZATION
@@ -41,56 +47,58 @@ router.get("/:code", async (req, res) => {
         if (/tablet/i.test(userAgent))
             device = "tablet";
         /* =========================
-           TRACK SCAN
+           TRACK SCAN (SAFE)
         ========================= */
-        await prisma_1.default.inviteScan.create({
-            data: {
-                inviteId: invite.id,
-                device,
-                browser: null,
-                os: null,
-                ip: ipAddress || null,
-            },
-        });
-        /* =========================
-           INCREMENT SCAN COUNTER
-        ========================= */
-        const updatedInvite = await prisma_1.default.invite.update({
-            where: { id: invite.id },
-            data: {
-                scanCount: { increment: 1 },
-            },
-        });
+        try {
+            await prisma_1.default.inviteScan.create({
+                data: {
+                    inviteId: invite.id,
+                    device,
+                    browser: null,
+                    os: null,
+                    ip: ipAddress || null,
+                },
+            });
+            await prisma_1.default.invite.update({
+                where: { id: invite.id },
+                data: {
+                    scanCount: { increment: 1 },
+                },
+            });
+        }
+        catch (analyticsError) {
+            console.error("Invite analytics failed:", analyticsError);
+        }
         /* =========================
            VALIDATION
         ========================= */
-        if (updatedInvite.used) {
+        if (invite.used) {
             return res.status(400).json({
-                error: "Invite already used",
-                scanCount: updatedInvite.scanCount,
+                reason: "used",
+                message: "Invite already used",
             });
         }
-        if (updatedInvite.expiresAt &&
-            updatedInvite.expiresAt < new Date()) {
+        if (invite.expiresAt &&
+            invite.expiresAt < new Date()) {
             return res.status(410).json({
-                error: "Invite expired",
-                expiresAt: updatedInvite.expiresAt,
-                scanCount: updatedInvite.scanCount,
+                reason: "expired",
+                message: "Invite expired",
+                expiresAt: invite.expiresAt,
             });
         }
         return res.json({
             valid: true,
-            code: updatedInvite.code,
-            premium: updatedInvite.premium,
-            expiresAt: updatedInvite.expiresAt,
-            used: updatedInvite.used,
-            scanCount: updatedInvite.scanCount,
+            code: invite.code,
+            premium: invite.premium,
+            expiresAt: invite.expiresAt,
+            used: invite.used,
         });
     }
     catch (error) {
         console.error("Public invite lookup error:", error);
         return res.status(500).json({
-            error: "Failed to validate invite",
+            reason: "server_error",
+            message: "Failed to validate invite",
         });
     }
 });

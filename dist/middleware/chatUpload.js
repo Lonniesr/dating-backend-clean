@@ -6,17 +6,30 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.chatUpload = void 0;
 const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
+/* =========================
+   ENSURE DIRECTORIES EXIST
+========================= */
+function ensureDir(dir) {
+    if (!fs_1.default.existsSync(dir)) {
+        fs_1.default.mkdirSync(dir, { recursive: true });
+    }
+}
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
+        let uploadPath = "";
         if (file.mimetype.startsWith("image/")) {
-            cb(null, "uploads/chat/images");
+            uploadPath = "uploads/chat/images";
         }
         else if (file.mimetype.startsWith("audio/")) {
-            cb(null, "uploads/chat/audio");
+            uploadPath = "uploads/chat/audio";
         }
         else {
-            cb(new Error("Unsupported file type"), "");
+            return cb(new Error("Unsupported file type"), "");
         }
+        // ✅ CREATE FOLDER IF IT DOESN'T EXIST
+        ensureDir(uploadPath);
+        cb(null, uploadPath);
     },
     filename: (req, file, cb) => {
         const ext = path_1.default.extname(file.originalname);

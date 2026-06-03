@@ -7,10 +7,6 @@ const express_1 = require("express");
 const prisma_1 = __importDefault(require("../../../prisma"));
 const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
-/**
- * POST /api/onboarding/photos
- * Saves user photo URLs
- */
 router.post("/", requireUser_1.requireUser, async (req, res) => {
     try {
         if (!req.user || !req.user.id) {
@@ -18,39 +14,23 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
         }
         const userId = req.user.id;
         const { photos } = req.body;
-        /* ==============================
-           VALIDATION
-        ============================== */
         if (!Array.isArray(photos)) {
-            return res.status(400).json({
-                error: "Photos must be an array",
-            });
+            return res.status(400).json({ error: "Photos must be an array" });
         }
         if (photos.length === 0) {
-            return res.status(400).json({
-                error: "At least one photo is required",
-            });
+            return res.status(400).json({ error: "At least one photo is required" });
         }
         if (photos.length > 6) {
-            return res.status(400).json({
-                error: "Maximum of 6 photos allowed",
-            });
+            return res.status(400).json({ error: "Maximum of 6 photos allowed" });
         }
-        const cleanedPhotos = photos.map((p) => typeof p === "string" ? p.trim() : "");
-        const validPhotos = cleanedPhotos.every((url) => typeof url === "string" && url.startsWith("http"));
+        const cleanedPhotos = photos
+            .map((p) => (typeof p === "string" ? p.trim() : ""))
+            .filter((url) => url.length > 0);
+        const validPhotos = cleanedPhotos.every((url) => url.startsWith("http"));
         if (!validPhotos) {
-            return res.status(400).json({
-                error: "All photos must be valid URLs",
-            });
+            return res.status(400).json({ error: "All photos must be valid URLs" });
         }
-        /* ==============================
-           SAVE PHOTOS
-        ============================== */
-        // delete existing photos
-        await prisma_1.default.photo.deleteMany({
-            where: { userId },
-        });
-        // create new photos
+        await prisma_1.default.photo.deleteMany({ where: { userId } });
         await prisma_1.default.photo.createMany({
             data: cleanedPhotos.map((url, index) => ({
                 userId,

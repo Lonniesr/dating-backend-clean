@@ -5,19 +5,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prisma_1 = __importDefault(require("../../../prisma"));
-const nanoid_1 = require("nanoid");
 const requireUser_1 = require("../../../middleware/requireUser");
 const router = (0, express_1.Router)();
 /**
  * GET /api/invite
- * Test route
  */
 router.get("/", (req, res) => {
     res.json({ message: "Invite route working" });
 });
 /**
  * GET /api/invite/stats
- * Invite statistics for logged in user
  */
 router.get("/stats", requireUser_1.requireUser, async (req, res) => {
     try {
@@ -43,7 +40,6 @@ router.get("/stats", requireUser_1.requireUser, async (req, res) => {
 });
 /**
  * GET /api/invite/leaderboard
- * Top inviters
  */
 router.get("/leaderboard", async (_req, res) => {
     try {
@@ -90,7 +86,6 @@ router.get("/leaderboard", async (_req, res) => {
 });
 /**
  * POST /api/invite
- * Generate invite
  */
 router.post("/", requireUser_1.requireUser, async (req, res) => {
     try {
@@ -98,9 +93,14 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
         const body = req.body || {};
         const premium = Boolean(body.premium);
         const expiresInDays = typeof body.expiresInDays === "number" ? body.expiresInDays : null;
-        const code = (0, nanoid_1.nanoid)(8);
+        /* ✅ FIX (ONLY CHANGE THAT MATTERS) */
+        const { nanoid } = await import("nanoid");
+        const code = nanoid(8);
         let expiresAt = null;
-        if (expiresInDays) {
+        if (premium) {
+            expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90);
+        }
+        else if (expiresInDays) {
             expiresAt = new Date();
             expiresAt.setDate(expiresAt.getDate() + expiresInDays);
         }
@@ -111,6 +111,8 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
                 invitedById: userId,
                 expiresAt,
                 used: false,
+                maxUses: premium ? null : 1,
+                usedCount: 0,
             },
         });
         const frontendBase = process.env.FRONTEND_URL ||

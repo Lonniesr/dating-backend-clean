@@ -16,7 +16,7 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
             return res.status(401).json({ message: "Unauthorized" });
         }
         const userId = req.user.id;
-        const [likesGiven, passesGiven, superLikesGiven, likesReceived] = await Promise.all([
+        const [likesGiven, passesGiven, superLikesGiven, likesReceived, matches] = await Promise.all([
             prisma_1.default.swipe.count({
                 where: {
                     swiperId: userId,
@@ -40,18 +40,27 @@ router.get("/", requireUser_1.requireUser, async (req, res) => {
                     targetId: userId,
                     liked: true
                 }
+            }),
+            prisma_1.default.match.count({
+                where: {
+                    OR: [
+                        { userAId: userId },
+                        { userBId: userId }
+                    ]
+                }
             })
         ]);
-        res.json({
+        return res.json({
             likesGiven,
             passesGiven,
             superLikesGiven,
-            likesReceived
+            likesReceived,
+            matches
         });
     }
     catch (err) {
         console.error("SWIPE STATS ERROR:", err);
-        res.status(500).json({
+        return res.status(500).json({
             message: "Failed to load swipe stats"
         });
     }

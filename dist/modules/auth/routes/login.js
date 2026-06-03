@@ -30,8 +30,15 @@ router.post("/", async (req, res) => {
             return res.status(401).json({ error: "Invalid credentials" });
         }
         await (0, bruteForce_1.resetFailures)(email, "user");
-        // 🔐 CLEAN JWT (database is source of truth)
-        const token = jsonwebtoken_1.default.sign({ sub: user.id }, env_1.env.JWT_SECRET, { expiresIn: "7d" });
+        /* =========================
+           ISSUE JWT
+        ========================= */
+        const token = jsonwebtoken_1.default.sign({
+            id: user.id,
+            role: user.role,
+        }, env_1.env.JWT_SECRET, {
+            expiresIn: "7d",
+        });
         res.cookie("token", token, {
             httpOnly: true,
             secure: env_1.env.NODE_ENV === "production",
@@ -39,10 +46,15 @@ router.post("/", async (req, res) => {
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: "/",
         });
-        return res.json({ ok: true });
+        return res.json({
+            success: true,
+        });
     }
-    catch {
-        return res.status(500).json({ error: "Server error" });
+    catch (err) {
+        console.error("LOGIN ERROR:", err);
+        return res.status(500).json({
+            error: "Server error",
+        });
     }
 });
 exports.default = router;

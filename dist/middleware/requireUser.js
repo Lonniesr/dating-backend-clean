@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireUser = requireUser;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../prisma"));
-const env_1 = require("./../config/env");
+const env_1 = require("../config/env");
 /* =========================
    TOKEN EXTRACTION
 ========================= */
@@ -23,7 +23,7 @@ function getToken(req) {
     return undefined;
 }
 /* =========================
-   JWT PAYLOAD EXTRACTION
+   EXTRACT USER ID FROM JWT
 ========================= */
 function getUserIdFromPayload(payload) {
     if (typeof payload === "string")
@@ -38,7 +38,7 @@ function getUserIdFromPayload(payload) {
     return undefined;
 }
 /* =========================
-   REQUIRE USER MIDDLEWARE
+   REQUIRE USER
 ========================= */
 async function requireUser(req, res, next) {
     try {
@@ -71,9 +71,19 @@ async function requireUser(req, res, next) {
         }
         /* =========================
            ONBOARDING GUARD
-        ========================== */
-        const isOnboardingRoute = req.originalUrl.startsWith("/api/onboarding");
-        if (!user.onboardingComplete && !isOnboardingRoute) {
+        ========================= */
+        const path = req.originalUrl;
+        /**
+         * Routes allowed before onboarding completes
+         */
+        const allowedBeforeOnboarding = path.startsWith("/api/onboarding") ||
+            path.startsWith("/api/profile") ||
+            path.startsWith("/api/auth") ||
+            path.startsWith("/api/user") ||
+            path.startsWith("/api/upload") ||
+            path.startsWith("/api/user/photos") ||
+            path.startsWith("/api/feedback"); // ✅ FIX ADDED HERE
+        if (!user.onboardingComplete && !allowedBeforeOnboarding) {
             res.status(403).json({
                 error: "Onboarding incomplete",
                 onboardingRequired: true,

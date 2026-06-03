@@ -40,13 +40,15 @@ async function getMatches(req, res) {
             orderBy: { createdAt: "desc" }
         });
         const formatted = matches.map((m) => {
-            var _a;
             const other = m.userAId === userId ? m.userB : m.userA;
+            const photos = Array.isArray(other.photos)
+                ? other.photos.map((p) => typeof p === "string" ? p : p === null || p === void 0 ? void 0 : p.url).filter(Boolean)
+                : [];
             return {
                 id: other.id,
                 name: other.name,
                 gender: other.gender,
-                photo: ((_a = other.photos) === null || _a === void 0 ? void 0 : _a[0]) || null
+                photos
             };
         });
         return res.json(formatted);

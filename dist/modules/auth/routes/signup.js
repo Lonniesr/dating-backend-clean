@@ -10,31 +10,43 @@ const prisma_1 = __importDefault(require("../../../prisma"));
 const env_1 = require("../../../config/env");
 const router = (0, express_1.Router)();
 router.post("/", async (req, res) => {
-    const { email, password, invite } = req.body;
     try {
+        const { email, password, invite, inviteCode, } = req.body;
+        const inviteValue = invite || inviteCode;
         /* =========================
            VALIDATION
         ========================= */
-        if (!email || !password || !invite) {
-            return res.status(400).json({ message: "Missing required fields." });
+        if (!email || !password || !inviteValue) {
+            return res.status(400).json({
+                message: "Missing required fields.",
+            });
         }
         const inviteRecord = await prisma_1.default.invite.findUnique({
-            where: { code: invite },
+            where: { code: inviteValue },
         });
         if (!inviteRecord) {
             return res.status(400).json({ reason: "not_found" });
         }
-        if (inviteRecord.used) {
+        // 🔥 FIXED: split logic for premium vs normal
+        if (!inviteRecord.premium && inviteRecord.used) {
             return res.status(400).json({ reason: "used" });
         }
         if (inviteRecord.expiresAt && inviteRecord.expiresAt < new Date()) {
             return res.status(400).json({ reason: "expired" });
         }
+        // 🔥 NEW: enforce usage limit for premium (if set)
+        if (inviteRecord.premium &&
+            inviteRecord.maxUses !== null &&
+            inviteRecord.usedCount >= inviteRecord.maxUses) {
+            return res.status(400).json({ reason: "limit_reached" });
+        }
         const existingUser = await prisma_1.default.user.findUnique({
             where: { email },
         });
         if (existingUser) {
-            return res.status(400).json({ message: "Email already registered." });
+            return res.status(400).json({
+                message: "Email already registered.",
+            });
         }
         /* =========================
            CREATE USER
@@ -56,40 +68,63 @@ router.post("/", async (req, res) => {
             },
         });
         /* =========================
-           UPDATE INVITE (ANALYTICS)
+           UPDATE INVITE ANALYTICS
         ========================= */
-        await prisma_1.default.invite.update({
-            where: { id: inviteRecord.id },
-            data: {
-                used: true,
-                usedAt: new Date(),
-                usedById: user.id,
-                signupCount: { increment: 1 },
-            },
-        });
+        if (inviteRecord.premium) {
+            // 🔥 PREMIUM: increment usage only
+            await prisma_1.default.invite.update({
+                where: { id: inviteRecord.id },
+                data: {
+                    usedCount: {
+                        increment: 1,
+                    },
+                    signupCount: { increment: 1 },
+                },
+            });
+        }
+        else {
+            // 🟢 NORMAL: keep existing behavior
+            await prisma_1.default.invite.update({
+                where: { id: inviteRecord.id },
+                data: {
+                    used: true,
+                    usedAt: new Date(),
+                    usedById: user.id,
+                    signupCount: { increment: 1 },
+                },
+            });
+        }
         /* =========================
            ISSUE JWT
         ========================= */
         const token = jsonwebtoken_1.default.sign({
-            sub: user.id,
+            id: user.id,
             role: user.role,
-        }, env_1.env.JWT_SECRET, { expiresIn: "7d" });
+        }, env_1.env.JWT_SECRET, {
+            expiresIn: "7d",
+        });
         /* =========================
-           COOKIE CONFIG (FIXED)
+           COOKIE CONFIG
         ========================= */
         const isProduction = env_1.env.NODE_ENV === "production";
         res.cookie("token", token, {
             httpOnly: true,
-            secure: isProduction, // true only on HTTPS production
-            sameSite: isProduction ? "none" : "lax", // lax for localhost
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
             path: "/",
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
-        return res.json({ success: true, user });
+        return res.json({
+            success: true,
+            user,
+        });
     }
     catch (error) {
         console.error("SIGNUP ERROR:", error);
-        return res.status(500).json({ success: false });
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+        });
     }
 });
 exports.default = router;

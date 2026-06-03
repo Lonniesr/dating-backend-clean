@@ -11,7 +11,8 @@ async function updateProfile(req, res) {
             return res.status(401).json({ error: "Unauthorized" });
         }
         const userId = req.user.id;
-        const { name, username, birthdate, gender, bio, birthplace, location, } = req.body;
+        const { name, username, birthdate, gender, bio, birthplace, location, preferences, prompts, } = req.body;
+        console.log("📥 UPDATE PAYLOAD:", req.body);
         /* ===============================
            BUILD SAFE UPDATE OBJECT
         =============================== */
@@ -38,6 +39,27 @@ async function updateProfile(req, res) {
             data.location = location.trim() || null;
         }
         /* ===============================
+           🔥 HANDLE PREFERENCES
+        =============================== */
+        if (preferences && typeof preferences === "object") {
+            data.preferences = {
+                interestedIn: preferences.interestedIn || null,
+                racePreference: preferences.racePreference || null,
+                minAge: Number(preferences.minAge) || 18,
+                maxAge: Number(preferences.maxAge) || 40,
+                locationRadius: preferences.locationRadius === null
+                    ? null
+                    : Number(preferences.locationRadius) || 50,
+            };
+        }
+        /* ===============================
+           🔥 HANDLE PROMPTS
+        =============================== */
+        if (Array.isArray(prompts)) {
+            data.prompts = prompts;
+        }
+        console.log("🛠️ UPDATE DATA:", data);
+        /* ===============================
            UPDATE USER
         =============================== */
         const updatedUser = await prisma_1.default.user.update({
@@ -54,16 +76,18 @@ async function updateProfile(req, res) {
                 birthplace: true,
                 location: true,
                 preferences: true,
+                prompts: true,
                 photos: true,
             },
         });
+        console.log("✅ PROFILE UPDATED");
         return res.json({
             success: true,
             user: updatedUser,
         });
     }
     catch (err) {
-        console.error("UPDATE PROFILE ERROR:", err);
+        console.error("❌ UPDATE PROFILE ERROR:", err);
         return res.status(500).json({
             error: "Server error",
         });

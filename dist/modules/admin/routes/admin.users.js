@@ -20,18 +20,9 @@ router.get("/", requireAdmin_1.requireAdmin, async (req, res) => {
         if (search) {
             where = {
                 OR: [
-                    {
-                        email: {
-                            contains: search,
-                            mode: "insensitive",
-                        },
-                    },
-                    {
-                        name: {
-                            contains: search,
-                            mode: "insensitive",
-                        },
-                    },
+                    { email: { contains: search, mode: "insensitive" } },
+                    { name: { contains: search, mode: "insensitive" } },
+                    { username: { contains: search, mode: "insensitive" } },
                 ],
             };
         }
@@ -44,6 +35,7 @@ router.get("/", requireAdmin_1.requireAdmin, async (req, res) => {
                 id: true,
                 email: true,
                 name: true,
+                username: true,
                 role: true,
                 verified: true,
                 banned: true,
@@ -68,14 +60,92 @@ router.get("/", requireAdmin_1.requireAdmin, async (req, res) => {
    GET /api/admin/users/:id
 ========================= */
 router.get("/:id", requireAdmin_1.requireAdmin, async (req, res) => {
+    var _a, _b;
     try {
+        const userId = req.params.id;
+        console.log("🔍 Fetching admin user:", userId);
+        /* =========================
+           GET USER
+        ========================= */
         const user = await prisma_1.default.user.findUnique({
-            where: { id: req.params.id },
+            where: { id: userId },
         });
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        return res.json(user);
+        console.log("🔥 RAW USER FROM PRISMA:", user);
+        /* =========================
+           CALCULATE AGE
+        ========================= */
+        let age = null;
+        if (user.birthdate) {
+            const birth = new Date(user.birthdate);
+            const today = new Date();
+            age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+            }
+        }
+        /* =========================
+           DERIVE LOCATION (coords)
+        ========================= */
+        let location = null;
+        if (user.latitude && user.longitude) {
+            location = `${user.latitude}, ${user.longitude}`;
+        }
+        /* =========================
+           GET PHOTOS
+        ========================= */
+        const photos = await prisma_1.default.photo.findMany({
+            where: { userId },
+            select: { url: true },
+        });
+        console.log("🔥 PHOTOS:", photos);
+        /* =========================
+           GET MATCHES
+        ========================= */
+        const matchesRaw = await prisma_1.default.match.findMany({
+            where: {
+                OR: [{ userAId: userId }, { userBId: userId }],
+            },
+            include: {
+                userA: { select: { id: true, name: true } },
+                userB: { select: { id: true, name: true } },
+            },
+        });
+        console.log("🔥 MATCHES RAW:", matchesRaw);
+        const matches = matchesRaw.map((m) => {
+            const isUserA = m.userAId === userId;
+            return {
+                id: m.id,
+                otherUserId: isUserA ? m.userB.id : m.userA.id,
+                otherUserName: isUserA
+                    ? m.userB.name || "User"
+                    : m.userA.name || "User",
+                createdAt: m.createdAt,
+            };
+        });
+        /* =========================
+           FINAL RESPONSE
+        ========================= */
+        const formatted = {
+            id: user.id,
+            name: user.name || user.username || "Unnamed User",
+            username: user.username,
+            email: user.email,
+            createdAt: (_a = user.createdAt) !== null && _a !== void 0 ? _a : new Date().toISOString(),
+            lastActiveAt: (_b = user.lastActiveAt) !== null && _b !== void 0 ? _b : null,
+            verified: user.verified,
+            banned: user.banned,
+            role: user.role,
+            age,
+            location,
+            photos: (photos === null || photos === void 0 ? void 0 : photos.map((p) => p.url)) || [],
+            matches: matches || [],
+        };
+        console.log("✅ FINAL RESPONSE:", formatted);
+        return res.json(formatted);
     }
     catch (err) {
         console.error("ADMIN USER DETAIL ERROR:", err);

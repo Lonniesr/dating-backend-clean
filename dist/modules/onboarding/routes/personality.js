@@ -7,10 +7,6 @@ const express_1 = require("express");
 const requireUser_1 = require("../../../middleware/requireUser");
 const prisma_1 = __importDefault(require("../../../prisma"));
 const router = (0, express_1.Router)();
-/**
- * POST /api/onboarding/personality
- * Saves user bio + personality prompts
- */
 router.post("/", requireUser_1.requireUser, async (req, res) => {
     try {
         if (!req.user || !req.user.id) {
@@ -18,25 +14,21 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
         }
         const userId = req.user.id;
         const { bio, prompts } = req.body;
-        // ----- Validation -----
-        if (bio && typeof bio !== "string") {
-            return res.status(400).json({
-                error: "Bio must be a string",
-            });
+        if (bio !== undefined && typeof bio !== "string") {
+            return res.status(400).json({ error: "Bio must be a string" });
         }
-        if (prompts && typeof prompts !== "object") {
-            return res.status(400).json({
-                error: "Prompts must be an object",
-            });
+        if (prompts !== undefined && typeof prompts !== "object") {
+            return res.status(400).json({ error: "Prompts must be an object" });
         }
         const updatedUser = await prisma_1.default.user.update({
             where: { id: userId },
             data: {
-                bio: bio ? bio.trim() : null,
-                prompts: prompts || null,
+                ...(bio !== undefined && { bio: bio.trim() }),
+                ...(prompts !== undefined && { prompts }),
             },
         });
         return res.json({
+            success: true,
             user: updatedUser,
         });
     }

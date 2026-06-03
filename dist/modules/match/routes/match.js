@@ -18,6 +18,28 @@ router.get("/user/matches", requireUser_1.requireUser, async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
+        /* =========================
+           NEW: BLOCK LOOKUP
+        ========================= */
+        const blocks = await prisma_1.default.block.findMany({
+            where: {
+                OR: [
+                    { blockerId: userId },
+                    { blockedId: userId }
+                ]
+            },
+            select: {
+                blockerId: true,
+                blockedId: true
+            }
+        });
+        const blockedIds = new Set();
+        for (const b of blocks) {
+            if (b.blockerId === userId)
+                blockedIds.add(b.blockedId);
+            if (b.blockedId === userId)
+                blockedIds.add(b.blockerId);
+        }
         const matches = await prisma_1.default.match.findMany({
             where: {
                 OR: [{ userAId: userId }, { userBId: userId }],
@@ -29,10 +51,12 @@ router.get("/user/matches", requireUser_1.requireUser, async (req, res) => {
                         id: true,
                         name: true,
                         gender: true,
-                        race: true,
-                        photos: true,
-                        birthdate: true,
                         location: true,
+                        birthdate: true,
+                        photos: {
+                            select: { url: true },
+                            orderBy: { order: "asc" },
+                        },
                     },
                 },
                 userB: {
@@ -40,28 +64,37 @@ router.get("/user/matches", requireUser_1.requireUser, async (req, res) => {
                         id: true,
                         name: true,
                         gender: true,
-                        race: true,
-                        photos: true,
-                        birthdate: true,
                         location: true,
+                        birthdate: true,
+                        photos: {
+                            select: { url: true },
+                            orderBy: { order: "asc" },
+                        },
                     },
                 },
             },
         });
-        // Normalize so frontend always gets "otherUser"
-        const normalizedMatches = matches.map((match) => {
+        const normalized = matches
+            .map((match) => {
             const otherUser = match.userAId === userId ? match.userB : match.userA;
             return {
-                id: match.id,
-                createdAt: match.createdAt,
-                user: otherUser,
+                id: otherUser.id,
+                name: otherUser.name,
+                gender: otherUser.gender,
+                location: otherUser.location,
+                birthdate: otherUser.birthdate,
+                photos: otherUser.photos.map((p) => p.url),
             };
-        });
-        return res.json(normalizedMatches);
+        })
+            /* =========================
+               NEW: FILTER BLOCKED
+            ========================= */
+            .filter((u) => !blockedIds.has(u.id));
+        res.json(normalized);
     }
     catch (err) {
         console.error("MATCH LIST ERROR:", err);
-        return res.status(500).json({ error: "Failed to load matches" });
+        res.status(500).json({ error: "Failed to load matches" });
     }
 });
 exports.default = router;

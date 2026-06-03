@@ -1,90 +1,78 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const prisma_1 = __importDefault(require("../../../prisma"));
+const supabase_1 = require("../../../services/supabase");
 const requireAdmin_1 = require("../../../middleware/requireAdmin");
 const router = (0, express_1.Router)();
-/**
- * GET
- * /api/admin/verification
- *
- * Returns users waiting for verification
- */
+/* =========================
+   GET ALL PENDING VERIFICATIONS
+========================= */
 router.get("/", requireAdmin_1.requireAdmin, async (_req, res) => {
     try {
-        const users = await prisma_1.default.user.findMany({
-            where: {
-                verification_status: "pending",
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                createdAt: true,
-                verification_selfie: true,
-                verification_status: true,
-                verified: true,
-            },
-        });
-        res.json({ users });
+        const { data, error } = await supabase_1.supabase
+            .from("User") // ✅ FIXED
+            .select("id, name, username, verification_selfie, verification_status")
+            .eq("verification_status", "pending");
+        if (error) {
+            console.error("❌ Fetch error FULL:", error);
+            throw error;
+        }
+        console.log("📦 Verification queue:", data); // ✅ DEBUG
+        res.json(data);
     }
     catch (err) {
-        console.error("ADMIN VERIFICATION ERROR:", err);
-        res.status(500).json({ error: "Server error" });
+        console.error("Fetch verification queue error:", err);
+        res.status(500).json({ message: "Failed to fetch verification queue" });
     }
 });
-/**
- * APPROVE
- * /api/admin/verification/:userId/approve
- */
-router.post("/:userId/approve", requireAdmin_1.requireAdmin, async (req, res) => {
+/* =========================
+   APPROVE USER
+========================= */
+router.post("/:id/approve", requireAdmin_1.requireAdmin, async (req, res) => {
     try {
-        const userId = req.params.userId;
-        await prisma_1.default.user.update({
-            where: { id: userId },
-            data: {
-                verified: true,
-                verification_status: "verified",
-            },
-        });
-        res.json({
-            success: true,
-            message: "User verified",
-        });
+        const { id } = req.params;
+        console.log("✅ Approving user:", id);
+        const { error } = await supabase_1.supabase
+            .from("User") // ✅ FIXED
+            .update({
+            verified: true,
+            verification_status: "approved",
+        })
+            .eq("id", id);
+        if (error) {
+            console.error("❌ Approve error FULL:", error);
+            throw error;
+        }
+        res.json({ success: true });
     }
     catch (err) {
-        console.error("VERIFY APPROVE ERROR:", err);
-        res.status(500).json({ error: "Server error" });
+        console.error("Approve error:", err);
+        res.status(500).json({ message: "Approve failed" });
     }
 });
-/**
- * REJECT
- * /api/admin/verification/:userId/reject
- */
-router.post("/:userId/reject", requireAdmin_1.requireAdmin, async (req, res) => {
+/* =========================
+   REJECT USER
+========================= */
+router.post("/:id/reject", requireAdmin_1.requireAdmin, async (req, res) => {
     try {
-        const userId = req.params.userId;
-        await prisma_1.default.user.update({
-            where: { id: userId },
-            data: {
-                verification_status: "rejected",
-                verification_selfie: null,
-            },
-        });
-        res.json({
-            success: true,
-            message: "Verification rejected",
-        });
+        const { id } = req.params;
+        console.log("❌ Rejecting user:", id);
+        const { error } = await supabase_1.supabase
+            .from("User") // ✅ FIXED
+            .update({
+            verified: false,
+            verification_status: "rejected",
+        })
+            .eq("id", id);
+        if (error) {
+            console.error("❌ Reject error FULL:", error);
+            throw error;
+        }
+        res.json({ success: true });
     }
     catch (err) {
-        console.error("VERIFY REJECT ERROR:", err);
-        res.status(500).json({ error: "Server error" });
+        console.error("Reject error:", err);
+        res.status(500).json({ message: "Reject failed" });
     }
 });
 exports.default = router;

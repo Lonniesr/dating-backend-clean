@@ -14,13 +14,33 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const { name, birthdate, gender, race, bio, birthplace, latitude, longitude, } = req.body;
+        const { name, username, birthdate, gender, race, bio, location, // ✅ NEW (replaces birthplace)
+        latitude, longitude, } = req.body;
+        /* =========================
+           NORMALIZE NAME
+        ========================= */
+        const finalName = (name || username || "").trim();
         /* =========================
            VALIDATION
         ========================= */
-        if (!name || !birthdate || !gender || !race) {
+        if (!finalName || !birthdate || !gender || !race) {
             return res.status(400).json({
-                message: "Name, birthdate, gender, and race are required.",
+                error: "Name, birthdate, gender, and race are required.",
+            });
+        }
+        // ✅ LOCATION REQUIRED
+        if (!location || !location.trim()) {
+            return res.status(400).json({
+                error: "Location is required.",
+            });
+        }
+        // ✅ COORDINATES REQUIRED
+        if (latitude === undefined ||
+            longitude === undefined ||
+            latitude === null ||
+            longitude === null) {
+            return res.status(400).json({
+                error: "Valid location coordinates required.",
             });
         }
         const validRaces = [
@@ -34,13 +54,13 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
         ];
         if (!validRaces.includes(race)) {
             return res.status(400).json({
-                message: "Invalid race value.",
+                error: "Invalid race value.",
             });
         }
         const parsedBirthdate = new Date(birthdate);
         if (isNaN(parsedBirthdate.getTime())) {
             return res.status(400).json({
-                message: "Invalid birthdate format.",
+                error: "Invalid birthdate format.",
             });
         }
         /* =========================
@@ -58,19 +78,15 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
         const updatedUser = await prisma_1.default.user.update({
             where: { id: userId },
             data: {
-                name: name.trim(),
+                name: finalName,
                 birthdate: parsedBirthdate,
                 age,
                 gender,
                 race,
-                bio: (bio === null || bio === void 0 ? void 0 : bio.trim()) || null,
-                birthplace: (birthplace === null || birthplace === void 0 ? void 0 : birthplace.trim()) || null,
-                latitude: latitude !== undefined && latitude !== null
-                    ? Number(latitude)
-                    : null,
-                longitude: longitude !== undefined && longitude !== null
-                    ? Number(longitude)
-                    : null,
+                location: location.trim(), // ✅ SAVED PROPERLY
+                ...(bio !== undefined && { bio: (bio === null || bio === void 0 ? void 0 : bio.trim()) || null }),
+                latitude: Number(latitude),
+                longitude: Number(longitude),
             },
             select: {
                 id: true,
@@ -80,7 +96,7 @@ router.post("/", requireUser_1.requireUser, async (req, res) => {
                 gender: true,
                 race: true,
                 bio: true,
-                birthplace: true,
+                location: true, // ✅ RETURNED
                 latitude: true,
                 longitude: true,
             },

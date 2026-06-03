@@ -107,7 +107,14 @@ router.get("/", requireUser, async (req: Request, res: Response) => {
         };
       })
     );
-
+console.log(
+  "🔥 FINAL CONVERSATIONS:",
+  JSON.stringify(
+    formatted.filter(Boolean),
+    null,
+    2
+  )
+);
     res.json(formatted.filter(Boolean));
 
   } catch (err) {

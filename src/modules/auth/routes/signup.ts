@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../../../prisma";
 import { env } from "../../../config/env";
+import { sendLynqMessage } from "../../../utils/sendLynqMessage";
 
 const router = Router();
 
@@ -89,6 +90,37 @@ router.post("/", async (req: Request, res: Response) => {
         onboardingComplete: true,
       },
     });
+
+    /* =========================
+   WELCOME MESSAGE
+========================= */
+
+try {
+  await sendLynqMessage(
+    user.id,
+    `🎉 Welcome to LynQ!
+
+We're excited to have you.
+
+✔ Verify your profile to unlock:
+
+• Unlimited messaging
+• Media sharing
+• Read receipts
+• Priority visibility
+
+Need help?
+
+Reply directly to this conversation and the LynQ Team will assist you.
+
+Let's LynQ ❤️`
+  );
+} catch (err) {
+  console.error(
+    "WELCOME MESSAGE ERROR:",
+    err
+  );
+}
 
     /* =========================
        UPDATE INVITE ANALYTICS

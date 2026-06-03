@@ -39,7 +39,10 @@ export async function sendLynqMessage(
         },
       });
   }
-
+console.log(
+  "🔥 LYNQ MESSAGE:",
+  userId
+);
   const message =
     await prisma.message.create({
       data: {

@@ -179,6 +179,8 @@ model Conversation {
   userAId String
   userBId String
 
+   isSystem Boolean @default(false)
+
   lastMessageId String?
 
   createdAt DateTime @default(now())

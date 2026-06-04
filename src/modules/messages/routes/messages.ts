@@ -3,8 +3,16 @@ import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 import { sendPushNotification } from "../../../services/push";
 import { activeChats } from "../../../server";
+import getConversations from "./getConversations";
 
 const router = Router();
+
+
+/**
+ * GET inbox conversations
+ */
+router.get("/", requireUser, getConversations);
+
 
 /**
  * Resolve conversation

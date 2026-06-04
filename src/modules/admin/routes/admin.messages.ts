@@ -128,6 +128,78 @@ router.get(
   }
 );
 
+
+/* =========================
+   GET CONVERSATION
+========================= */
+
+router.get(
+  "/conversation",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const userA = String(req.query.userA || "");
+      const userB = String(req.query.userB || "");
+
+      if (!userA || !userB) {
+        return res.status(400).json({
+          error: "userA and userB required",
+        });
+      }
+
+      const messages = await prisma.message.findMany({
+        where: {
+          OR: [
+            {
+              senderId: userA,
+              receiverId: userB,
+            },
+            {
+              senderId: userB,
+              receiverId: userA,
+            },
+          ],
+        },
+
+        orderBy: {
+          createdAt: "asc",
+        },
+
+        include: {
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+
+          receiver: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      return res.json({
+        messages,
+      });
+    } catch (err) {
+      console.error(
+        "GET CONVERSATION ERROR:",
+        err
+      );
+
+      return res.status(500).json({
+        error: "Server error",
+      });
+    }
+  }
+);
+
 /* =========================
    SEND TO ONE USER
 ========================= */

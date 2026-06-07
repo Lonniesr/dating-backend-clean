@@ -111,12 +111,15 @@ router.get(
       }
 
       return res.json({
-        valid: true,
-        code: invite.code,
-        premium: invite.premium,
-        expiresAt: invite.expiresAt,
-        used: invite.used,
-      });
+  valid: true,
+  code: invite.code,
+  premium: invite.premium,
+  expiresAt: invite.expiresAt,
+  used: invite.used,
+
+  redirectToInviter: invite.redirectToInviter,
+  invitedById: invite.invitedById,
+});
 
     } catch (error) {
       console.error("Public invite lookup error:", error);

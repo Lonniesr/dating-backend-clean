@@ -222,6 +222,8 @@ model Invite {
   scanCount   Int @default(0)
   signupCount Int @default(0)
 
+  redirectToInviter Boolean @default(false)
+
   invitedBy User? @relation("Invite_invitedByIdToUser", fields: [invitedById], references: [id], onDelete: SetNull)
   usedBy    User? @relation("Invite_usedByIdToUser", fields: [usedById], references: [id], onDelete: SetNull)
 

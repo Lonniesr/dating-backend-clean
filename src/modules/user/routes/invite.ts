@@ -26,13 +26,17 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
 
     const code = await generateNanoId(10);
 
-    const invite = await prisma.invite.create({
-      data: {
-        code,
-        invitedById: userId,
-        used: false,
-      },
-    });
+    const redirectToInviter =
+  req.body.redirectToInviter === true;
+
+const invite = await prisma.invite.create({
+  data: {
+    code,
+    invitedById: userId,
+    used: false,
+    redirectToInviter,
+  },
+});
 
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     const inviteLink = `${frontendUrl}/invite/${invite.code}`;

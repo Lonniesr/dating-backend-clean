@@ -29,6 +29,11 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
     const redirectToInviter =
   req.body.redirectToInviter === true;
 
+console.log(
+  "redirectToInviter received:",
+  req.body.redirectToInviter
+);
+
 const invite = await prisma.invite.create({
   data: {
     code,

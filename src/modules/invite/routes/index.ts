@@ -99,7 +99,17 @@ router.post("/", requireUser, async (req: any, res: Response) => {
     const userId = req.user.id;
 
     const body = req.body || {};
-    const premium = Boolean(body.premium);
+
+const premium = Boolean(body.premium);
+
+const redirectToInviter =
+  body.redirectToInviter === true ||
+  body.redirectToInviter === "true";
+
+console.log(
+  "redirectToInviter:",
+  redirectToInviter
+);
     const expiresInDays =
       typeof body.expiresInDays === "number" ? body.expiresInDays : null;
 
@@ -117,16 +127,18 @@ router.post("/", requireUser, async (req: any, res: Response) => {
     }
 
     const invite = await prisma.invite.create({
-      data: {
-        code,
-        premium,
-        invitedById: userId,
-        expiresAt,
-        used: false,
-        maxUses: premium ? null : 1,
-        usedCount: 0,
-      },
-    });
+  data: {
+    code,
+    premium,
+    invitedById: userId,
+    expiresAt,
+    used: false,
+    maxUses: premium ? null : 1,
+    usedCount: 0,
+
+    redirectToInviter,
+  },
+});
 
     const frontendBase =
       process.env.FRONTEND_URL ||
@@ -136,13 +148,16 @@ router.post("/", requireUser, async (req: any, res: Response) => {
 
     const inviteLink = `${frontendBase}/invite/${invite.code}`;
 
-    return res.json({
-      id: invite.id,
-      code: invite.code,
-      inviteLink,
-      premium: invite.premium,
-      expiresAt: invite.expiresAt,
-    });
+   return res.json({
+  id: invite.id,
+  code: invite.code,
+  inviteLink,
+  premium: invite.premium,
+  expiresAt: invite.expiresAt,
+
+  redirectToInviter:
+    invite.redirectToInviter,
+});
 
   } catch (err) {
     console.error("INVITE CREATE ERROR:", err);

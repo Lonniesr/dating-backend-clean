@@ -182,12 +182,14 @@ router.post(
           });
 
           if (!existingMatch) {
-            await prisma.match.create({
-              data: {
-                userAId,
-                userBId,
-              },
-            });
+           await prisma.match.create({
+  data: {
+    userAId,
+    userBId,
+    userASeen: false,
+    userBSeen: false,
+  },
+});
 
             await prisma.notification.create({
               data: {

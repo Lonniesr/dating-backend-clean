@@ -38,14 +38,20 @@ router.get(
           }
         }),
 
-        prisma.match.count({
-          where: {
-            OR: [
-              { userAId: userId },
-              { userBId: userId }
-            ]
-          }
-        })
+       prisma.match.count({
+  where: {
+    OR: [
+      {
+        userAId: userId,
+        userASeen: false,
+      },
+      {
+        userBId: userId,
+        userBSeen: false,
+      },
+    ],
+  },
+}) 
 
       ]);
 

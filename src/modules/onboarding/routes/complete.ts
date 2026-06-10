@@ -77,20 +77,40 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
             },
           });
 
-        if (!conversation) {
-          conversation =
-            await prisma.conversation.create({
-              data: {
-                userAId: inviterId,
-                userBId: inviteeId,
-              },
-            });
+       if (!conversation) {
+  conversation =
+    await prisma.conversation.create({
+      data: {
+        userAId: inviterId,
+        userBId: inviteeId,
+      },
+    });
 
-          console.log(
-            "🔥 INVITER CONVERSATION CREATED:",
-            conversation.id
-          );
-        }
+  const firstMessage =
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: inviterId,
+        receiverId: inviteeId,
+        text:
+          "👋 Thanks for joining LynQ through my personal invite. Feel free to say hello!",
+      },
+    });
+
+  await prisma.conversation.update({
+    where: {
+      id: conversation.id,
+    },
+    data: {
+      lastMessageId: firstMessage.id,
+    },
+  });
+
+  console.log(
+    "🔥 INVITER CONVERSATION CREATED:",
+    conversation.id
+  );
+}
 
         await sendLynqMessage(
           inviteeId,

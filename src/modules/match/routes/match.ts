@@ -37,10 +37,34 @@ router.get(
 
       const blockedIds = new Set<string>();
 
-      for (const b of blocks) {
-        if (b.blockerId === userId) blockedIds.add(b.blockedId);
-        if (b.blockedId === userId) blockedIds.add(b.blockerId);
-      }
+for (const b of blocks) {
+  if (b.blockerId === userId) blockedIds.add(b.blockedId);
+  if (b.blockedId === userId) blockedIds.add(b.blockerId);
+}
+
+/* =========================
+   MARK MATCHES AS SEEN
+========================= */
+
+await prisma.match.updateMany({
+  where: {
+    userAId: userId,
+    userASeen: false,
+  },
+  data: {
+    userASeen: true,
+  },
+});
+
+await prisma.match.updateMany({
+  where: {
+    userBId: userId,
+    userBSeen: false,
+  },
+  data: {
+    userBSeen: true,
+  },
+});
 
       const matches = await prisma.match.findMany({
         where: {

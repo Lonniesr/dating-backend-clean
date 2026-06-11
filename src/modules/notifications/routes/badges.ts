@@ -12,6 +12,7 @@ router.get(
   requireUser,
   async (req: Request & { user?: any }, res: Response) => {
     try {
+      console.log("LOADING NOTIFICATION BADGES FOR USER:", req.user?.id);
       const userId = req.user?.id;
 
       if (!userId) {
@@ -54,7 +55,11 @@ router.get(
 }) 
 
       ]);
-
+console.log("BADGES:", {
+  unreadMessages,
+  newLikes,
+  newMatches,
+});
       return res.json({
         unreadMessages,
         newLikes,

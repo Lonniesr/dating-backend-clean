@@ -10,8 +10,6 @@ const router = Router();
 
 router.get("/badges", requireUser, async (req: any, res) => {
   try {
-    console.log("🔥 USER NOTIFICATIONS ROUTE HIT");
-
     const userId = req.user?.id;
 
     if (!userId) {
@@ -44,10 +42,7 @@ router.get("/badges", requireUser, async (req: any, res) => {
       }),
     ]);
 
-    console.log("🔥 BADGES:", {
-      unreadMessages,
-      newMatches,
-    });
+   
 
     return res.json({
       unreadMessages,

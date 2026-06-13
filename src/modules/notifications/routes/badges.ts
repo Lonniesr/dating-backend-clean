@@ -60,11 +60,12 @@ console.log("BADGES:", {
   newLikes,
   newMatches,
 });
-      return res.json({
-        unreadMessages,
-        newLikes,
-        newMatches
-      });
+     return res.json({
+  TEST: "BADGES_ROUTE_IS_RUNNING",
+  unreadMessages,
+  newLikes,
+  newMatches
+});
 
     } catch (err) {
       console.error("NOTIFICATION BADGES ERROR:", err);

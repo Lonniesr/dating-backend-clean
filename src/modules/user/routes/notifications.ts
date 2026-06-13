@@ -9,6 +9,7 @@ const router = Router();
 
 router.get("/badges", requireUser, async (req, res) => {
   try {
+    console.log("🔥 USER NOTIFICATIONS ROUTE HIT");
     res.json({
       messages: 0,
       matches: 0,

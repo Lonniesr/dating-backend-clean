@@ -101,6 +101,28 @@ await prisma.match.updateMany({
         },
       });
 
+const likes = await prisma.swipe.findMany({
+  where: {
+    targetId: userId,
+    liked: true,
+  },
+  include: {
+    swiper: {
+      select: {
+        id: true,
+        name: true,
+        gender: true,
+        location: true,
+        birthdate: true,
+        photos: {
+          select: { url: true },
+          orderBy: { order: "asc" },
+        },
+      },
+    },
+  },
+});
+
       const normalized = matches
         .map((match) => {
           const otherUser =
@@ -120,7 +142,21 @@ await prisma.match.updateMany({
         ========================= */
         .filter((u) => !blockedIds.has(u.id));
 
-      res.json(normalized);
+        const normalizedLikes = likes
+  .map((like) => ({
+    id: like.swiper.id,
+    name: like.swiper.name,
+    gender: like.swiper.gender,
+    location: like.swiper.location,
+    birthdate: like.swiper.birthdate,
+    photos: like.swiper.photos.map((p) => p.url),
+  }))
+  .filter((u) => !blockedIds.has(u.id));
+
+res.json({
+  matches: normalized,
+  likes: normalizedLikes,
+});
 
     } catch (err) {
       console.error("MATCH LIST ERROR:", err);

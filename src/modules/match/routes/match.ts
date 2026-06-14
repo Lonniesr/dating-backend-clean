@@ -153,6 +153,10 @@ const likes = await prisma.swipe.findMany({
   }))
   .filter((u) => !blockedIds.has(u.id));
 
+  console.log("🔥 NEW MATCH ROUTE ACTIVE");
+console.log("🔥 MATCHES:", normalized.length);
+console.log("🔥 LIKES:", normalizedLikes.length);
+
 res.json({
   matches: normalized,
   likes: normalizedLikes,

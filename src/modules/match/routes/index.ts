@@ -1,10 +1,9 @@
 import { Router } from "express";
 
+import matchRoutes from "./match";
+
 const router = Router();
 
-// Temporary test route
-router.get("/", (req, res) => {
-  res.json({ message: "Match routes working" });
-});
+router.use(matchRoutes);
 
 export default router;

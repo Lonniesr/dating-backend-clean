@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
-
+console.log("🔥 MATCH.TS FILE LOADED");
 const router = Router();
 
 /**

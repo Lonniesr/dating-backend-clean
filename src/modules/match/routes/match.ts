@@ -14,6 +14,7 @@ router.get(
   async (req: Request & { user?: any }, res: Response) => {
     try {
       const userId = req.user?.id;
+      console.log("🔥 MATCH ROUTE HIT BY:", userId);
 
       if (!userId) {
         return res.status(401).json({ error: "Unauthorized" });
@@ -156,7 +157,8 @@ const likes = await prisma.swipe.findMany({
   console.log("🔥 NEW MATCH ROUTE ACTIVE");
 console.log("🔥 MATCHES:", normalized.length);
 console.log("🔥 LIKES:", normalizedLikes.length);
-
+console.log("🔥 RETURNING MATCHES:", normalized.length);
+console.log("🔥 RETURNING LIKES:", normalizedLikes.length);
 res.json({
   matches: normalized,
   likes: normalizedLikes,

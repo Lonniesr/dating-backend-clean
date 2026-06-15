@@ -37,6 +37,23 @@ export default async function getMatches(req: Request, res: Response) {
       orderBy: { createdAt: "desc" }
     });
 
+const likes = await prisma.swipe.findMany({
+  where: {
+    targetId: userId,
+    liked: true,
+  },
+  include: {
+    swiper: {
+      select: {
+        id: true,
+        name: true,
+        gender: true,
+        photos: true,
+      },
+    },
+  },
+});
+
     const formatted = matches.map((m: typeof matches[number]) => {
       const other =
         m.userAId === userId ? m.userB : m.userA;
@@ -54,8 +71,29 @@ export default async function getMatches(req: Request, res: Response) {
         photos
       };
     });
+const formattedLikes = likes.map((like) => {
+  const photos = Array.isArray(like.swiper.photos)
+    ? like.swiper.photos
+        .map((p: any) =>
+          typeof p === "string" ? p : p?.url
+        )
+        .filter(Boolean)
+    : [];
 
-    return res.json(formatted);
+  return {
+    id: like.swiper.id,
+    name: like.swiper.name,
+    gender: like.swiper.gender,
+    photos,
+  };
+});
+console.log("🔥 MATCHES:", formatted.length);
+console.log("🔥 LIKES:", formattedLikes.length);
+
+return res.json({
+  matches: formatted,
+  likes: formattedLikes,
+});
 
   } catch (err) {
     console.error("GET MATCHES ERROR:", err);

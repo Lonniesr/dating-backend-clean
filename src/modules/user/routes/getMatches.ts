@@ -87,14 +87,20 @@ const formattedLikes = likes.map((like) => {
     photos,
   };
 });
+const matchedIds = new Set(
+  formatted.map((m) => m.id)
+);
+
+const filteredLikes = formattedLikes.filter(
+  (like) => !matchedIds.has(like.id)
+);
 console.log("🔥 MATCHES:", formatted.length);
-console.log("🔥 LIKES:", formattedLikes.length);
+console.log("🔥 LIKES:", filteredLikes.length);
 
 return res.json({
   matches: formatted,
-  likes: formattedLikes,
+  likes: filteredLikes,
 });
-
   } catch (err) {
     console.error("GET MATCHES ERROR:", err);
     return res.status(500).json({ error: "Server error" });

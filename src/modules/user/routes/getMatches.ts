@@ -37,11 +37,29 @@ export default async function getMatches(req: Request, res: Response) {
       orderBy: { createdAt: "desc" }
     });
 
-const likes = await prisma.swipe.findMany({
+const mySwipes = await prisma.swipe.findMany({
   where: {
-    targetId: userId,
-    liked: true,
+    swiperId: userId,
   },
+  select: {
+    targetId: true,
+  },
+});
+
+const alreadySwipedIds = mySwipes.map(
+  (s) => s.targetId
+);
+
+const likes = await prisma.swipe.findMany({
+  
+where: {
+  targetId: userId,
+  liked: true,
+  swiperId: {
+    notIn: alreadySwipedIds,
+  },
+},
+
   include: {
     swiper: {
       select: {
@@ -53,6 +71,8 @@ const likes = await prisma.swipe.findMany({
     },
   },
 });
+
+
 
     const formatted = matches.map((m: typeof matches[number]) => {
       const other =

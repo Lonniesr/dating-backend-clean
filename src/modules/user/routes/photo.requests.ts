@@ -15,6 +15,17 @@ router.post("/request", requireUser, async (req: Request, res: Response) => {
       message?: string;
     };
 
+const requester = await prisma.user.findUnique({
+  where: { id: requesterId },
+  select: { verified: true },
+});
+
+if (!requester?.verified) {
+  return res.status(403).json({
+    error: "Verify your profile to request private photos.",
+  });
+}
+
     if (!requesterId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -191,8 +202,19 @@ router.get("/can-view/:photoId", requireUser, async (req: Request, res: Response
     }
 
     const photo = await prisma.photo.findUnique({
-      where: { id: photoId },
-    });
+  where: { id: photoId },
+});
+
+const viewer = await prisma.user.findUnique({
+  where: { id: userId },
+  select: { verified: true },
+});
+
+if (!viewer?.verified) {
+  return res.json({
+    canView: false,
+  });
+}
 
     if (!photo) {
       return res.status(404).json({ error: "Photo not found" });

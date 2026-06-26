@@ -98,6 +98,37 @@ router.post("/", requireUser, async (req: any, res: Response) => {
   try {
     const userId = req.user.id;
 
+    const dbUser = await prisma.user.findUnique({
+  where: { id: userId },
+  select: {
+    verified: true,
+  },
+});
+
+if (!dbUser) {
+  return res.status(401).json({
+    error: "Unauthorized",
+  });
+}
+
+if (!dbUser.verified) {
+  const activeInvite = await prisma.invite.findFirst({
+    where: {
+      invitedById: userId,
+      used: false,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+  });
+
+  if (activeInvite) {
+    return res.status(403).json({
+      error: "You already have an active invite. Verify your profile for unlimited invites.",
+    });
+  }
+}
+
     const body = req.body || {};
 
 const premium = Boolean(body.premium);
@@ -119,13 +150,14 @@ console.log(
 
     let expiresAt: Date | null = null;
 
-    if (premium) {
-      expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90);
-    } else if (expiresInDays) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + expiresInDays);
-    }
-
+if (premium) {
+  expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 90);
+} else if (!dbUser.verified) {
+  expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+} else if (expiresInDays) {
+  expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + expiresInDays);
+}
     const invite = await prisma.invite.create({
   data: {
     code,

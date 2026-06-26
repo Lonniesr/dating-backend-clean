@@ -24,6 +24,38 @@ router.post("/", requireUser, async (req: Request, res: Response) => {
 
     const userId = user.id;
 
+    const dbUser = await prisma.user.findUnique({
+  where: { id: userId },
+  select: {
+    verified: true,
+  },
+});
+
+if (!dbUser) {
+  return res.status(401).json({
+    error: "Unauthorized",
+  });
+}
+
+if (!dbUser.verified) {
+  const activeInvite = await prisma.invite.findFirst({
+    where: {
+      invitedById: userId,
+      used: false,
+      expiresAt: {
+        gt: new Date(),
+      },
+    },
+  });
+
+  if (activeInvite) {
+    return res.status(403).json({
+      error:
+        "You already have an active invite. Verify your profile for unlimited invites.",
+    });
+  }
+}
+
     const code = await generateNanoId(10);
 
     const redirectToInviter =
@@ -42,6 +74,10 @@ const invite = await prisma.invite.create({
     invitedById: userId,
     used: false,
     redirectToInviter,
+
+    expiresAt: dbUser.verified
+      ? null
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   },
 });
 

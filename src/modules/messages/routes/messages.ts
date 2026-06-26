@@ -138,17 +138,47 @@ router.post("/:id", requireUser, async (req: any, res) => {
 
     const isMedia = !!imageUrl || !!audioUrl;
 
-    if (!sender.verified && isMedia) {
-      return res.status(403).json({
-        message: "Verify your profile to send photos and voice messages.",
-      });
-    }
+if (!sender.verified && isMedia) {
+  return res.status(403).json({
+    message: "Verify your profile to send photos and voice messages.",
+  });
+}
 
-    if (!text && !imageUrl && !audioUrl) {
-      return res.status(400).json({
-        message: "Message cannot be empty.",
-      });
-    }
+/* =========================
+   NON-VERIFIED MESSAGE LIMIT
+========================= */
+
+if (!sender.verified) {
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const messagesSentToday = await prisma.message.count({
+    where: {
+      senderId,
+      createdAt: {
+        gte: startOfDay,
+      },
+    },
+  });
+
+  console.log(
+    "🔥 NON VERIFIED MESSAGES TODAY:",
+    messagesSentToday
+  );
+
+  if (messagesSentToday >= 10) {
+    return res.status(403).json({
+      message:
+        "Daily message limit reached. Verify your profile for unlimited messaging.",
+    });
+  }
+}
+
+if (!text && !imageUrl && !audioUrl) {
+  return res.status(400).json({
+    message: "Message cannot be empty.",
+  });
+}
 
     const conversation = await resolveConversation(senderId, id);
 

@@ -9,7 +9,10 @@ router.post("/", async (req, res) => {
   try {
     const { email } = req.body;
 
+    console.log("🔵 Forgot password request received");
+
     if (!email || typeof email !== "string") {
+      console.log("❌ Invalid email supplied");
       return res.json({
         success: true,
       });
@@ -17,14 +20,19 @@ router.post("/", async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    console.log("🔍 Looking up user:", normalizedEmail);
+
     const user = await prisma.user.findUnique({
       where: {
         email: normalizedEmail,
       },
     });
 
+    console.log("👤 User found:", !!user);
+
     // Never reveal whether the account exists
     if (!user) {
+      console.log("⚠️ No user found. Returning success.");
       return res.json({
         success: true,
       });
@@ -32,6 +40,8 @@ router.post("/", async (req, res) => {
 
     // Generate secure token
     const token = crypto.randomBytes(32).toString("hex");
+
+    console.log("🔑 Reset token generated");
 
     // Store only the hash
     const tokenHash = crypto
@@ -42,14 +52,16 @@ router.post("/", async (req, res) => {
     // Expire in one hour
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    // Remove any previous reset links
+    console.log("🧹 Removing previous reset tokens");
+
     await prisma.passwordResetToken.deleteMany({
       where: {
         userId: user.id,
       },
     });
 
-    // Save new token
+    console.log("💾 Saving new reset token");
+
     await prisma.passwordResetToken.create({
       data: {
         userId: user.id,
@@ -58,8 +70,11 @@ router.post("/", async (req, res) => {
       },
     });
 
-    // Send email
+    console.log("📧 Calling Resend...");
+
     await sendPasswordResetEmail(user.email, token);
+
+    console.log("✅ Resend finished successfully");
 
     console.log(`✅ Password reset email sent to ${user.email}`);
 
@@ -67,9 +82,9 @@ router.post("/", async (req, res) => {
       success: true,
     });
   } catch (err) {
-    console.error("FORGOT PASSWORD ERROR:", err);
+    console.error("❌ FORGOT PASSWORD ERROR:");
+    console.error(err);
 
-    // Do not leak errors to client
     return res.json({
       success: true,
     });

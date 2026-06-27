@@ -9,18 +9,14 @@ router.post("/", async (req, res) => {
   try {
     const { email } = req.body;
 
-    console.log("🔵 Forgot password request received");
-
+    // Invalid request
     if (!email || typeof email !== "string") {
-      console.log("❌ Invalid email supplied");
-      return res.json({
-        success: true,
+      return res.status(400).json({
+        error: "Email is required.",
       });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-
-    console.log("🔍 Looking up user:", normalizedEmail);
 
     const user = await prisma.user.findUnique({
       where: {
@@ -28,40 +24,33 @@ router.post("/", async (req, res) => {
       },
     });
 
-    console.log("👤 User found:", !!user);
-
     // Never reveal whether the account exists
     if (!user) {
-      console.log("⚠️ No user found. Returning success.");
       return res.json({
         success: true,
       });
     }
 
-    // Generate secure token
+    // Generate secure reset token
     const token = crypto.randomBytes(32).toString("hex");
 
-    console.log("🔑 Reset token generated");
-
-    // Store only the hash
+    // Store only the hashed token
     const tokenHash = crypto
       .createHash("sha256")
       .update(token)
       .digest("hex");
 
-    // Expire in one hour
+    // Token expires in 1 hour
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    console.log("🧹 Removing previous reset tokens");
-
+    // Remove any existing reset tokens for this user
     await prisma.passwordResetToken.deleteMany({
       where: {
         userId: user.id,
       },
     });
 
-    console.log("💾 Saving new reset token");
-
+    // Save new reset token
     await prisma.passwordResetToken.create({
       data: {
         userId: user.id,
@@ -70,21 +59,16 @@ router.post("/", async (req, res) => {
       },
     });
 
-    console.log("📧 Calling Resend...");
-
+    // Send password reset email
     await sendPasswordResetEmail(user.email, token);
-
-    console.log("✅ Resend finished successfully");
-
-    console.log(`✅ Password reset email sent to ${user.email}`);
 
     return res.json({
       success: true,
     });
   } catch (err) {
-    console.error("❌ FORGOT PASSWORD ERROR:");
-    console.error(err);
+    console.error("FORGOT PASSWORD ERROR:", err);
 
+    // Never expose internal errors or account existence
     return res.json({
       success: true,
     });

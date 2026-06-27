@@ -167,11 +167,12 @@ if (!sender.verified) {
   );
 
   if (messagesSentToday >= 10) {
-    return res.status(403).json({
-      message:
-        "Daily message limit reached. Verify your profile for unlimited messaging.",
-    });
-  }
+  return res.status(403).json({
+    code: "MESSAGE_LIMIT_REACHED",
+    message:
+      "Daily message limit reached. Verify your profile for unlimited messaging.",
+  });
+}
 }
 
 if (!text && !imageUrl && !audioUrl) {

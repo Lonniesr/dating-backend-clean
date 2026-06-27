@@ -37,4 +37,7 @@ export const env = {
 
   SUPABASE_URL: required("SUPABASE_URL"),
   SUPABASE_SERVICE_ROLE_KEY: required("SUPABASE_SERVICE_ROLE_KEY"),
+  
+  RESEND_API_KEY: required("RESEND_API_KEY"),
+  EMAIL_FROM: required("EMAIL_FROM"),
 };

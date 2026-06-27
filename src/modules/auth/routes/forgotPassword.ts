@@ -40,8 +40,8 @@ router.post("/", async (req, res) => {
       .update(token)
       .digest("hex");
 
-    // Token expires in 1 hour
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      // expires 1
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     // Remove any existing reset tokens for this user
     await prisma.passwordResetToken.deleteMany({

@@ -11,6 +11,10 @@ model User {
   id                 String   @id @default(uuid())
   email              String   @unique
   password           String
+
+ // Incremented whenever all existing sessions should be invalidated
+  tokenVersion       Int      @default(0)
+
   inviteCode         String?
 
   role               String   @default("user")

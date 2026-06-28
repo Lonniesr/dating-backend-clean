@@ -41,13 +41,16 @@ function getToken(req: Request): string | undefined {
     return authHeader.split(" ")[1];
   }
 
-  const cookieToken = req.cookies?.token;
+ const cookieToken = req.cookies?.token;
 
-  if (typeof cookieToken === "string") {
-    return cookieToken;
-  }
+console.log("🍪 Cookie token:", cookieToken);
+console.log("📨 Authorization header:", req.headers.authorization);
 
-  return undefined;
+if (typeof cookieToken === "string") {
+  return cookieToken;
+}
+
+return undefined;
 }
 
 /* =========================
@@ -84,13 +87,17 @@ export async function requireUser(
   try {
     const token = getToken(req);
 
-    if (!token) {
+console.log("🔑 TOKEN FOUND:", !!token);
+
+if (!token) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
-    const decoded = jwt.verify(token, env.JWT_SECRET);
-const jwtTokenVersion =
+const decoded = jwt.verify(token, env.JWT_SECRET);
+
+console.log("✅ JWT VERIFIED:", decoded);
+    const jwtTokenVersion =
   typeof decoded === "object"
     ? (decoded as any).tokenVersion
     : undefined;

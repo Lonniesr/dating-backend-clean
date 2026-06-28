@@ -43,9 +43,6 @@ function getToken(req: Request): string | undefined {
 
  const cookieToken = req.cookies?.token;
 
-console.log("🍪 Cookie token:", cookieToken);
-console.log("📨 Authorization header:", req.headers.authorization);
-
 if (typeof cookieToken === "string") {
   return cookieToken;
 }
@@ -87,8 +84,6 @@ export async function requireUser(
   try {
     const token = getToken(req);
 
-console.log("🔑 TOKEN FOUND:", !!token);
-
 if (!token) {
       res.status(401).json({ error: "Unauthorized" });
       return;
@@ -96,7 +91,6 @@ if (!token) {
 
 const decoded = jwt.verify(token, env.JWT_SECRET);
 
-console.log("✅ JWT VERIFIED:", decoded);
     const jwtTokenVersion =
   typeof decoded === "object"
     ? (decoded as any).tokenVersion
@@ -126,8 +120,7 @@ console.log("✅ JWT VERIFIED:", decoded);
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    console.log("JWT tokenVersion:", jwtTokenVersion);
-console.log("DB tokenVersion:", user.tokenVersion);
+    
 if (jwtTokenVersion !== user.tokenVersion) {
   res.status(401).json({
     error: "Session expired. Please log in again.",

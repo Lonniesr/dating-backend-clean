@@ -126,6 +126,8 @@ console.log("✅ JWT VERIFIED:", decoded);
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
+    console.log("JWT tokenVersion:", jwtTokenVersion);
+console.log("DB tokenVersion:", user.tokenVersion);
 if (jwtTokenVersion !== user.tokenVersion) {
   res.status(401).json({
     error: "Session expired. Please log in again.",

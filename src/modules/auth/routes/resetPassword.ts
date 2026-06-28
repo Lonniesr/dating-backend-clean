@@ -20,10 +20,18 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Basic password validation
-    if (password.length < 8) {
+    // Password must contain:
+    // - at least 8 characters
+    // - one uppercase letter
+    // - one lowercase letter
+    // - one number
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(password)) {
       return res.status(400).json({
-        error: "Password must be at least 8 characters.",
+        error:
+          "Password must be at least 8 characters and include an uppercase letter, lowercase letter and a number.",
       });
     }
 

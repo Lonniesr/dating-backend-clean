@@ -65,8 +65,11 @@ router.post("/", async (req, res) => {
           id: resetToken.userId,
         },
         data: {
-          password: hashedPassword,
-        },
+  password: hashedPassword,
+  tokenVersion: {
+    increment: 1,
+  },
+},
       }),
 
       prisma.passwordResetToken.update({

@@ -15,6 +15,7 @@ export interface AuthUser {
   name: string | null;
   gender: string | null;
   preferences: any | null;
+  tokenVersion: number;
 }
 
 /* =========================
@@ -89,32 +90,41 @@ export async function requireUser(
     }
 
     const decoded = jwt.verify(token, env.JWT_SECRET);
-
+const jwtTokenVersion =
+  typeof decoded === "object"
+    ? (decoded as any).tokenVersion
+    : undefined;
     const userId = getUserIdFromPayload(decoded);
 
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-
+    
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        id: true,
-        email: true,
-        role: true,
-        onboardingComplete: true,
-        name: true,
-        gender: true,
-        preferences: true,
-      },
+  id: true,
+  email: true,
+  role: true,
+  onboardingComplete: true,
+  name: true,
+  gender: true,
+  preferences: true,
+  tokenVersion: true,
+},
     });
 
     if (!user) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-
+if (jwtTokenVersion !== user.tokenVersion) {
+  res.status(401).json({
+    error: "Session expired. Please log in again.",
+  });
+  return;
+}
     /* =========================
        ONBOARDING GUARD
     ========================= */

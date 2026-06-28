@@ -45,15 +45,16 @@ router.post("/", async (req, res) => {
     ========================= */
 
     const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-      },
-      env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
+  {
+    id: user.id,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  },
+  env.JWT_SECRET,
+  {
+    expiresIn: "7d",
+  }
+);
 
     res.cookie("token", token, {
       httpOnly: true,

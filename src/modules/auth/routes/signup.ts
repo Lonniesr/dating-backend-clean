@@ -84,11 +84,12 @@ router.post("/", async (req: Request, res: Response) => {
         inviteCode: inviteRecord.code,
       },
       select: {
-        id: true,
-        email: true,
-        role: true,
-        onboardingComplete: true,
-      },
+  id: true,
+  email: true,
+  role: true,
+  onboardingComplete: true,
+  tokenVersion: true,
+},
     });
 
     /* =========================
@@ -155,15 +156,16 @@ Let's LynQ ❤️`
     ========================= */
 
     const token = jwt.sign(
-      {
-        id: user.id,
-        role: user.role,
-      },
-      env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
+  {
+    id: user.id,
+    role: user.role,
+    tokenVersion: user.tokenVersion,
+  },
+  env.JWT_SECRET,
+  {
+    expiresIn: "7d",
+  }
+);
 
     /* =========================
        COOKIE CONFIG

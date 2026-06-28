@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireAdmin } from "../../../middleware/requireAdmin";
+import { supabase } from "../../../services/supabase";
 
 const router = Router();
 
@@ -199,6 +200,96 @@ router.get(
     } catch (err) {
       console.error("ADMIN USER DETAIL ERROR:", err);
       return res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
+/* =========================
+   DELETE /api/admin/users/:id
+========================= */
+
+router.delete(
+  "/:id",
+  requireAdmin,
+  async (req: Request<{ id: string }>, res: Response) => {
+    try {
+      const userId = req.params.id;
+
+      // Prevent deleting yourself
+      if ((req as any).user?.id === userId) {
+        return res.status(400).json({
+          error: "You cannot delete your own account.",
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          role: true,
+          email: true,
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          error: "User not found.",
+        });
+      }
+
+      // Don't allow deleting admins
+      if (user.role === "admin") {
+        return res.status(403).json({
+          error: "Admin accounts cannot be deleted.",
+        });
+      }
+
+      await prisma.$transaction(async (tx) => {
+        // Report model has no FK cascade
+        await tx.report.deleteMany({
+          where: {
+            OR: [
+              { reporterId: userId },
+              { reportedId: userId },
+            ],
+          },
+        });
+
+        // Delete user.
+        // Everything with onDelete: Cascade
+        // will automatically be removed.
+        await tx.user.delete({
+          where: {
+            id: userId,
+          },
+        });
+      });
+
+      // Remove from Supabase Auth
+      try {
+        const { error } = await supabase.auth.admin.deleteUser(userId);
+
+if (error) {
+  console.error("SUPABASE DELETE ERROR:", error);
+
+  return res.status(500).json({
+    error: "User was removed from the database but could not be removed from Supabase Auth.",
+  });
+}
+      } catch (err) {
+        console.error("SUPABASE AUTH DELETE FAILED:", err);
+      }
+
+      return res.json({
+        success: true,
+        message: "User deleted successfully.",
+      });
+    } catch (err) {
+      console.error("DELETE USER ERROR:", err);
+
+      return res.status(500).json({
+        error: "Failed to delete user.",
+      });
     }
   }
 );

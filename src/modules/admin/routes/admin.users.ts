@@ -83,7 +83,7 @@ router.get(
   async (req: Request<{ id: string }>, res: Response) => {
     try {
       const userId = req.params.id;
-
+      console.log("🔥 ADMIN USER ID:", userId);
       console.log("🔍 Fetching admin user:", userId);
 
       /* =========================
@@ -169,6 +169,130 @@ router.get(
         };
       });
 
+/* =========================
+   DASHBOARD COUNTS
+========================= */
+
+const [
+  messageCount,
+  swipeCount,
+  inviteCount,
+  reportCount,
+] = await Promise.all([
+
+  prisma.message.count({
+    where: {
+      OR: [
+        { senderId: userId },
+        { receiverId: userId },
+      ],
+    },
+  }),
+
+  prisma.swipe.count({
+    where: {
+      swiperId: userId,
+    },
+  }),
+
+  prisma.invite.count({
+  where: {
+    invitedById: userId,
+  },
+}),
+  prisma.report.count({
+    where: {
+      OR: [
+        { reporterId: userId },
+        { reportedId: userId },
+      ],
+    },
+  }),
+
+]);
+/* =========================
+   RECENT CONVERSATIONS
+========================= */
+
+const conversationsRaw = await prisma.conversation.findMany({
+  where: {
+    OR: [
+      { userAId: userId },
+      { userBId: userId },
+    ],
+  },
+  include: {
+    userA: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+    userB: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+    messages: {
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 1,
+      select: {
+        text: true,
+        createdAt: true,
+      },
+    },
+  },
+  orderBy: {
+    updatedAt: "desc",
+  },
+  take: 10,
+});
+
+const conversations = conversationsRaw.map((c) => {
+  const otherUser =
+    c.userAId === userId ? c.userB : c.userA;
+
+  return {
+    id: c.id,
+    otherUserName: otherUser?.name || "Unknown User",
+    lastMessage:
+      c.messages[0]?.text || "No messages",
+    createdAt:
+      c.messages[0]?.createdAt || c.updatedAt,
+  };
+});
+/* =========================
+   RECENT SWIPES
+========================= */
+
+const swipesRaw = await prisma.swipe.findMany({
+  where: {
+    swiperId: userId,
+  },
+  include: {
+    target: {
+      select: {
+        id: true,
+        name: true,
+      },
+    },
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+  take: 20,
+});
+console.log("🔥 SWIPES RAW:", swipesRaw);
+const swipes = swipesRaw.map((swipe) => ({
+  id: swipe.id,
+  targetName: swipe.target?.name || "Unknown User",
+  liked: swipe.liked,
+  superLike: swipe.superLike,
+  createdAt: swipe.createdAt,
+}));
       /* =========================
          FINAL RESPONSE
       ========================= */
@@ -186,12 +310,19 @@ router.get(
         verified: user.verified,
         banned: user.banned,
         role: user.role,
+       
+        messageCount,
+        swipeCount,
+        inviteCount,
+        reportCount,
 
         age,
         location,
 
         photos: photos?.map((p) => p.url) || [],
         matches: matches || [],
+        conversations,
+        swipes,
       };
 
       console.log("✅ FINAL RESPONSE:", formatted);

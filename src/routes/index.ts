@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireUser } from "../middleware/requireUser";
 import { updateLastActive } from "../middleware/updateLastActive";
+import adminShadowBanRoutes from "../modules/admin/routes/admin.shadowBan";
 
 /* =========================
    USER ROUTES
@@ -183,6 +184,7 @@ router.use("/admin/bans", adminBansRoutes);
 router.use("/admin/swipe", adminSwipeRoutes);
 router.use("/admin/matches", adminMatchesRoutes);
 router.use("/admin/verification", adminVerificationRoutes);
+router.use("/admin/shadow-ban", adminShadowBanRoutes);
 
 /* 🔥 NEW: ADMIN SEARCH */
 router.use("/admin/search", adminSearchRoutes);

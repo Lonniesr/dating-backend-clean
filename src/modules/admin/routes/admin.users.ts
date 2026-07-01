@@ -309,6 +309,7 @@ const swipes = swipesRaw.map((swipe) => ({
 
         verified: user.verified,
         banned: user.banned,
+        shadowBanned: user.shadowBanned,
         role: user.role,
        
         messageCount,

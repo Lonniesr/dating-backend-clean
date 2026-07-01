@@ -60,6 +60,7 @@ model User {
 
   adminFlags         Json?
   adminNotes         String?
+  shadowBanned Boolean @default(false)
 
   superLikesRemaining Int     @default(3)
   superLikesResetAt   DateTime?

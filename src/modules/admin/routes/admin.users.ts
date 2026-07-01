@@ -396,20 +396,30 @@ router.delete(
         });
       });
 
-      // Remove from Supabase Auth
-      try {
-        const { error } = await supabase.auth.admin.deleteUser(userId);
+     // Remove from Supabase Auth
+try {
+  const { error } = await supabase.auth.admin.deleteUser(userId);
 
-if (error) {
-  console.error("SUPABASE DELETE ERROR:", error);
+  if (error) {
+    // User is already gone from Supabase Auth.
+    if (error.code === "user_not_found") {
+      console.log("ℹ️ Supabase Auth user already deleted.");
+    } else {
+      console.error("SUPABASE DELETE ERROR:", error);
+
+      return res.status(500).json({
+        error:
+          "User was removed from the database but could not be removed from Supabase Auth.",
+      });
+    }
+  }
+} catch (err) {
+  console.error("SUPABASE AUTH DELETE FAILED:", err);
 
   return res.status(500).json({
-    error: "User was removed from the database but could not be removed from Supabase Auth.",
+    error: "Failed to delete user from Supabase Auth.",
   });
 }
-      } catch (err) {
-        console.error("SUPABASE AUTH DELETE FAILED:", err);
-      }
 
       return res.json({
         success: true,

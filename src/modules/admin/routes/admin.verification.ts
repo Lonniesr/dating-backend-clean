@@ -89,4 +89,39 @@ router.post("/:id/reject", requireAdmin, async (req, res) => {
   }
 });
 
+/* =========================
+   REMOVE VERIFICATION
+========================= */
+
+router.post("/:id/remove", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log("🗑 Removing verification:", id);
+
+    const { error } = await supabase
+      .from("User")
+      .update({
+        verified: false,
+        verification_status: null,
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("❌ Remove verification error:", error);
+      throw error;
+    }
+
+    res.json({
+      success: true,
+    });
+  } catch (err) {
+    console.error("Remove verification failed:", err);
+
+    res.status(500).json({
+      message: "Remove verification failed",
+    });
+  }
+});
+
 export default router;

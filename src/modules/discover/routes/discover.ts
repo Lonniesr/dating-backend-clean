@@ -138,19 +138,21 @@ router.get(
       ].slice(0, 500);
 
       const candidates = await prisma.user.findMany({
-        where: {
-          id: {
-            not: userId,
-            notIn: excludedIds,
-          },
-          role: "user",
-          onboardingComplete: true,
-          banned: false,
-          photos: { some: {} },
+       where: {
+  id: {
+    not: userId,
+    notIn: excludedIds,
+  },
 
-          ...(onlyVerified && {
-            verified: true,
-          }),
+  role: "user",
+  onboardingComplete: true,
+
+  banned: false,
+  shadowBanned: false,
+
+  photos: {
+    some: {},
+  },
 
           ...(interested === "men" && {
             gender: {

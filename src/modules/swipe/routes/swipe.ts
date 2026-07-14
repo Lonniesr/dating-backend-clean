@@ -110,21 +110,47 @@ router.post(
          ELO RANKING UPDATE (FIXED)
       =============================== */
 
-      const [swiper, target] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: swiperId },
-          select: { eloScore: true, role: true },
-        }),
-        prisma.user.findUnique({
-          where: { id: targetId },
-          select: { eloScore: true, role: true },
-        }),
-      ]);
+     const [swiper, target] = await Promise.all([
+  prisma.user.findUnique({
+    where: { id: swiperId },
+    select: {
+      eloScore: true,
+      role: true,
+      shadowBanned: true,
+    },
+  }),
 
-      // 🔐 prevent admin / invalid targets
-      if (!target || target.role !== "user") {
-        return res.status(400).json({ error: "Invalid target" });
-      }
+  prisma.user.findUnique({
+    where: { id: targetId },
+    select: {
+      eloScore: true,
+      role: true,
+      shadowBanned: true,
+    },
+  }),
+]);
+
+     // Prevent invalid users
+if (!swiper || !target) {
+  return res.status(400).json({
+    error: "Invalid user",
+  });
+}
+
+// Prevent admins
+if (target.role !== "user") {
+  return res.status(400).json({
+    error: "Invalid target",
+  });
+}
+
+// Shadow banned users cannot participate in swiping
+if (swiper.shadowBanned || target.shadowBanned) {
+  return res.json({
+    success: true,
+    isMatch: false,
+  });
+}
 
       if (swiper && target) {
         const result = isLiked ? 1 : 0;

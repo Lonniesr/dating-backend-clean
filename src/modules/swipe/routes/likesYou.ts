@@ -59,25 +59,29 @@ router.get(
         },
         orderBy: { createdAt: "desc" },
         include: {
-          swiper: {
-            select: {
-              id: true,
-              name: true,
-              gender: true,
-              race: true,
-              birthdate: true,
-              location: true,
-              photos: {
-                select: { url: true },
-                orderBy: { order: "asc" },
-              },
-            },
-          },
+       swiper: {
+  select: {
+    id: true,
+    name: true,
+    gender: true,
+    race: true,
+    birthdate: true,
+    location: true,
+    shadowBanned: true,
+
+    photos: {
+      select: { url: true },
+      orderBy: { order: "asc" },
+    },
+  },
+},   
         },
       });
 
-      const formatted = likes.map((l) => ({
-        id: l.swiper.id,
+const formatted = likes
+  .filter((l) => !l.swiper.shadowBanned)
+  .map((l) => ({
+      id: l.swiper.id,
         name: l.swiper.name,
         gender: l.swiper.gender,
         race: l.swiper.race,

@@ -80,6 +80,7 @@ await prisma.match.updateMany({
               gender: true,
               location: true,
               birthdate: true,
+              shadowBanned: true,
               photos: {
                 select: { url: true },
                 orderBy: { order: "asc" },
@@ -93,6 +94,7 @@ await prisma.match.updateMany({
               gender: true,
               location: true,
               birthdate: true,
+              shadowBanned: true,
               photos: {
                 select: { url: true },
                 orderBy: { order: "asc" },
@@ -115,6 +117,7 @@ const likes = await prisma.swipe.findMany({
         gender: true,
         location: true,
         birthdate: true,
+        shadowBanned: true,
         photos: {
           select: { url: true },
           orderBy: { order: "asc" },
@@ -136,13 +139,18 @@ const likes = await prisma.swipe.findMany({
             location: otherUser.location,
             birthdate: otherUser.birthdate,
             photos: otherUser.photos.map((p) => p.url),
+            shadowBanned: otherUser.shadowBanned,
           };
+
         })
         /* =========================
            NEW: FILTER BLOCKED
         ========================= */
-        .filter((u) => !blockedIds.has(u.id));
-
+.filter(
+  (u) =>
+    !blockedIds.has(u.id) &&
+    !(u as any).shadowBanned
+);
         const normalizedLikes = likes
   .map((like) => ({
     id: like.swiper.id,
@@ -151,6 +159,7 @@ const likes = await prisma.swipe.findMany({
     location: like.swiper.location,
     birthdate: like.swiper.birthdate,
     photos: like.swiper.photos.map((p) => p.url),
+    shadowBanned: like.swiper.shadowBanned,
   }))
   .filter((u) => !blockedIds.has(u.id));
 

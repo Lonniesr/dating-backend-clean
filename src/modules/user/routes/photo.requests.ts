@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
+import { emitBadgeUpdate } from "../../../services/badges";
 
 const router = Router();
 
@@ -72,6 +73,12 @@ if (!requester?.verified) {
       },
     });
 
+/* =========================
+   🔴 LIVE BADGE UPDATE
+========================= */
+
+await emitBadgeUpdate(photo.userId);
+
     // 🔥 REAL-TIME EMIT TO OWNER
     const io = req.app.get("io");
     io.to(`user:${photo.userId}`).emit("photo:request:new", {
@@ -124,6 +131,12 @@ router.post("/respond", requireUser, async (req: Request, res: Response) => {
       where: { id: requestId },
       data: { status },
     });
+
+/* =========================
+   🔴 LIVE BADGE UPDATE
+========================= */
+
+await emitBadgeUpdate(ownerId);
 
     // 🔥 REAL-TIME EMIT TO REQUESTER
     const io = req.app.get("io");

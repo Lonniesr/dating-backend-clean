@@ -3,6 +3,7 @@ import prisma from "../../../prisma";
 import redis from "../../../redis";
 import { requireUser } from "../../../middleware/requireUser";
 import { calculateElo } from "../../../utils/elo"; // ✅ NEW
+import { emitBadgeUpdate } from "../../../services/badges";
 
 const router = Router();
 
@@ -106,6 +107,14 @@ router.post(
         });
       }
 
+/* ===============================
+   🔴 LIVE LIKE BADGE
+=============================== */
+
+if (isLiked) {
+  await emitBadgeUpdate(targetId);
+}
+
       /* ===============================
          ELO RANKING UPDATE (FIXED)
       =============================== */
@@ -207,24 +216,28 @@ if (swiper.shadowBanned || target.shadowBanned) {
             },
           });
 
-          if (!existingMatch) {
-           await prisma.match.create({
-  data: {
-    userAId,
-    userBId,
-    userASeen: false,
-    userBSeen: false,
-  },
-});
+         if (!existingMatch) {
+  await prisma.match.create({
+    data: {
+      userAId,
+      userBId,
+      userASeen: false,
+      userBSeen: false,
+    },
+  });
 
-            await prisma.notification.create({
-              data: {
-                userId: targetId,
-                type: "match",
-                actorId: swiperId,
-              },
-            });
-          }
+  await prisma.notification.create({
+    data: {
+      userId: targetId,
+      type: "match",
+      actorId: swiperId,
+    },
+  });
+
+  // 🔴 Update both users' match badges
+  await emitBadgeUpdate(userAId);
+  await emitBadgeUpdate(userBId);
+}
 
           isMatch = true;
         }

@@ -2,9 +2,9 @@ import { Request, Response } from "express";
 import prisma from "../../../prisma";
 import { activeChats } from "../../../server";
 import { sendPushNotification } from "../../../services/push";
+import { emitBadgeUpdate } from "../../../services/badges";
 
 async function resolveConversation(userId: string, id: string) {
-
   // try conversationId first
   let conversation = await prisma.conversation.findUnique({
     where: { id },
@@ -41,7 +41,6 @@ export default async function sendMessage(
   res: Response
 ) {
   try {
-
     const senderId = (req as any).user?.id;
     const id = req.params.conversationId;
     const { text } = req.body;
@@ -51,10 +50,15 @@ export default async function sendMessage(
     }
 
     if (!text || !text.trim()) {
-      return res.status(400).json({ error: "Message text required" });
+      return res
+        .status(400)
+        .json({ error: "Message text required" });
     }
 
-    const conversation = await resolveConversation(senderId, id);
+    const conversation = await resolveConversation(
+      senderId,
+      id
+    );
 
     const receiverId =
       conversation.userAId === senderId
@@ -79,94 +83,96 @@ export default async function sendMessage(
     });
 
     /* =========================
-   🔔 PUSH NOTIFICATION
-========================= */
+       🔔 PUSH NOTIFICATION
+    ========================= */
 
-try {
+    try {
+      const activeChatUserId =
+        activeChats.get(receiverId);
 
-  const activeChatUserId =
-  activeChats.get(receiverId);
+      const suppressPush =
+        activeChatUserId &&
+        activeChatUserId === senderId;
 
-const suppressPush =
-  activeChatUserId &&
-  activeChatUserId === senderId;
+      console.log(
+        "📱 RECEIVER ACTIVE CHAT:",
+        activeChatUserId
+      );
 
-console.log(
-  "📱 RECEIVER ACTIVE CHAT:",
-  activeChatUserId
-);
+      console.log(
+        "👤 SENDER:",
+        senderId
+      );
 
-console.log(
-  "👤 SENDER:",
-  senderId
-);
+      console.log(
+        "🔕 SUPPRESS PUSH:",
+        suppressPush
+      );
 
-console.log(
-  "🔕 SUPPRESS PUSH:",
-  suppressPush
-);
+      if (!suppressPush) {
+        const receiver =
+          await prisma.user.findUnique({
+            where: { id: receiverId },
+            select: {
+              pushToken: true,
+              name: true,
+            },
+          });
 
-  if (!suppressPush) {
+        const sender =
+          await prisma.user.findUnique({
+            where: { id: senderId },
+            select: {
+              name: true,
+            },
+          });
 
-    const receiver = await prisma.user.findUnique({
-      where: { id: receiverId },
-      select: {
-        pushToken: true,
-        name: true,
-      },
-    });
+        if (receiver?.pushToken) {
+          await sendPushNotification({
+            token: receiver.pushToken,
+            title:
+              sender?.name ||
+              "New message",
+            body: text.trim(),
+            data: {
+              type: "chat",
+              userId: senderId,
+            },
+          });
 
-    const sender = await prisma.user.findUnique({
-      where: { id: senderId },
-      select: {
-        name: true,
-      },
-    });
-
-    if (receiver?.pushToken) {
-
-      await sendPushNotification({
-        token: receiver.pushToken,
-
-        title: sender?.name || "New message",
-
-        body: text.trim(),
-
-        data: {
-          type: "chat",
-          userId: senderId,
-        },
-      });
-
-      console.log("🔔 Push notification sent");
-
-    } else {
-
-      console.log("⚠️ No push token");
-
+          console.log(
+            "🔔 Push notification sent"
+          );
+        } else {
+          console.log("⚠️ No push token");
+        }
+      } else {
+        console.log(
+          "🔕 Push suppressed (active chat)"
+        );
+      }
+    } catch (err) {
+      console.error(
+        "❌ PUSH ERROR:",
+        err
+      );
     }
 
-  } else {
+    /* =========================
+       🔴 LIVE BADGE UPDATE
+    ========================= */
 
-    console.log("🔕 Push suppressed (active chat)");
-
-  }
-
-} catch (err) {
-
-  console.error("❌ PUSH ERROR:", err);
-
-}
+    await emitBadgeUpdate(receiverId);
 
     return res.json(message);
-
   } catch (err) {
-
-    console.error("SEND MESSAGE ERROR:", err);
+    console.error(
+      "SEND MESSAGE ERROR:",
+      err
+    );
 
     return res.status(500).json({
       error: "Failed to send message",
     });
-
   }
 }

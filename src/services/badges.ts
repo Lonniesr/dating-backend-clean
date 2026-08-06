@@ -4,6 +4,8 @@ import { io } from "../server";
 export async function emitBadgeUpdate(
   userId: string
 ) {
+  console.log("🔥 emitBadgeUpdate CALLED:", userId);
+
   try {
     /* =========================
        UNREAD MESSAGES
@@ -21,12 +23,13 @@ export async function emitBadgeUpdate(
        NEW LIKES
     ========================= */
 
-   const newLikes = await prisma.swipe.count({
-  where: {
-    targetId: userId,
-    liked: true,
-  },
-});
+    const newLikes =
+      await prisma.swipe.count({
+        where: {
+          targetId: userId,
+          liked: true,
+        },
+      });
 
     /* =========================
        NEW MATCHES
@@ -66,6 +69,8 @@ export async function emitBadgeUpdate(
       newMatches,
       photoRequests,
     };
+
+    console.log("📤 EMITTING BADGES TO:", `user:${userId}`);
 
     io.to(`user:${userId}`).emit(
       "badges",

@@ -4,8 +4,6 @@ import { io } from "../server";
 export async function emitBadgeUpdate(
   userId: string
 ) {
-  console.log("🔥 emitBadgeUpdate CALLED:", userId);
-
   try {
     /* =========================
        UNREAD MESSAGES
@@ -70,16 +68,8 @@ export async function emitBadgeUpdate(
       photoRequests,
     };
 
-    console.log("📤 EMITTING BADGES TO:", `user:${userId}`);
-
     io.to(`user:${userId}`).emit(
       "badges",
-      badges
-    );
-
-    console.log(
-      "📬 BADGES UPDATED:",
-      userId,
       badges
     );
   } catch (err) {

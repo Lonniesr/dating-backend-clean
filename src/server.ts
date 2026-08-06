@@ -102,11 +102,7 @@ io.on("connection", (socket) => {
 
   socket.join(`user:${userId}`);
 
-console.log(
-  "✅ JOINED USER ROOM:",
-  `user:${userId}`,
-  socket.id
-);
+
 
   // 🟢 MARK ONLINE
   onlineUsers.add(userId);

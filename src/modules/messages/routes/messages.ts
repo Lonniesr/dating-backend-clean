@@ -2,6 +2,7 @@ import { Router } from "express";
 import prisma from "../../../prisma";
 import { requireUser } from "../../../middleware/requireUser";
 import { sendPushNotification } from "../../../services/push";
+import { emitBadgeUpdate } from "../../../services/badges";
 import { activeChats } from "../../../server";
 import getConversations from "./getConversations";
 
@@ -314,7 +315,17 @@ if (!text && !imageUrl && !audioUrl) {
 
 }
 
-    return res.json(message);
+/* =========================
+   🔴 LIVE BADGE UPDATE
+========================= */
+
+try {
+  await emitBadgeUpdate(receiverId);
+} catch (err) {
+  console.error("❌ Badge update error:", err);
+}
+
+return res.json(message);
 
   } catch (err) {
     console.error("SEND MESSAGE ERROR:", err);

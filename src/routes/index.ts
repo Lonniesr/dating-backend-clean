@@ -10,6 +10,7 @@ import adminShadowBanRoutes from "../modules/admin/routes/admin.shadowBan";
 import authRoutes from "../modules/auth/routes";
 import onboardingRoutes from "../modules/onboarding/routes";
 import matchRoutes from "../modules/match/routes";
+import activityRoutes from "../modules/activity/routes";
 
 /* 🔥 FIXED IMPORT */
 import messageRoutes from "../modules/messages/routes/messages";
@@ -101,6 +102,12 @@ router.use("/auth", authRoutes);
 
 router.use("/invite", inviteRoutes);
 router.use("/invite", publicInviteRoutes);
+
+/* =========================
+   🟢 PUBLIC ACTIVITY STATUS
+========================= */
+
+router.use("/activity", activityRoutes);
 
 /* =========================
    AUTH PROTECTION

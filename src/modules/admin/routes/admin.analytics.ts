@@ -182,27 +182,81 @@ router.get(
 );
 
 /**
- * DAILY SIGNUPS / CONVERSION
+ * DAILY INVITE SIGNUPS
  *
- * Invite.createdAt is the invite's creation date, not a signup date.
- * Invite.signupCount cannot reconstruct actual daily signup history.
- *
- * Return an explicit unavailable response instead of publishing
- * incorrectly dated signup counts.
- *
- * Implement this endpoint against timestamped signup records once
- * the signup model and attribution relationship are available.
+ * Counts existing user accounts with a saved invite code,
+ * grouped by their actual account creation date in UTC.
  */
 router.get(
   "/daily-conversion",
   async (_req: Request, res: Response): Promise<void> => {
-    res.status(409).json({
-      error:
-        "Daily signup history is unavailable from invite counters.",
-      code: "DAILY_SIGNUP_HISTORY_UNAVAILABLE",
-      message:
-        "Accurate daily signups require individual signup timestamps and invite attribution. Invite creation dates cannot be used as signup dates.",
-    });
+    try {
+      const cutoff = new Date();
+
+      const users = await prisma.user.findMany({
+        where: {
+          inviteCode: {
+            not: null,
+          },
+          createdAt: {
+            lte: cutoff,
+          },
+        },
+        select: {
+          createdAt: true,
+          inviteCode: true,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+
+      const grouped = new Map<string, number>();
+      let firstDay: number | undefined;
+
+      for (const user of users) {
+        if (!user.inviteCode?.trim()) continue;
+
+        const date = utcDayKey(user.createdAt);
+
+        grouped.set(date, (grouped.get(date) ?? 0) + 1);
+
+        if (firstDay === undefined) {
+          firstDay = utcDayStart(user.createdAt).getTime();
+        }
+      }
+
+      res.setHeader("X-Analytics-Timezone", "UTC");
+      res.setHeader("X-Analytics-As-Of", cutoff.toISOString());
+
+      if (firstDay === undefined) {
+        res.json([]);
+        return;
+      }
+
+      const lastDay = utcDayStart(cutoff).getTime();
+      const result: { date: string; signups: number }[] = [];
+
+      for (
+        let timestamp = firstDay;
+        timestamp <= lastDay;
+        timestamp += DAY_MS
+      ) {
+        const date = utcDayKey(new Date(timestamp));
+
+        result.push({
+          date,
+          signups: grouped.get(date) ?? 0,
+        });
+      }
+
+      res.json(result);
+    } catch (err: unknown) {
+      console.error("DAILY SIGNUPS ERROR:", err);
+      res.status(500).json({
+        error: "Daily signup analytics error",
+      });
+    }
   }
 );
 

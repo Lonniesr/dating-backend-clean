@@ -138,6 +138,7 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
   latitude: user.latitude,
   longitude: user.longitude,
   photos: processedPhotos,
+  isAmbassador: user.role === "ambassador",
   prompts: user.prompts || {},
   verified: user.verified,
   verification_status: user.verification_status,

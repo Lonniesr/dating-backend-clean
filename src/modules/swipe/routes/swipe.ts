@@ -146,8 +146,8 @@ if (!swiper || !target) {
   });
 }
 
-// Prevent admins
-if (target.role !== "user") {
+// Only member roles can receive swipes.
+if (target.role !== "user" && target.role !== "ambassador") {
   return res.status(400).json({
     error: "Invalid target",
   });

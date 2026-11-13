@@ -363,7 +363,7 @@ router.get(
             }),
           },
 
-          role: "user",
+          role: { in: ["user", "ambassador"] },
 
           onboardingComplete: true,
 

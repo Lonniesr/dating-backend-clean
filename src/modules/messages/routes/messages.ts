@@ -130,7 +130,7 @@ router.post("/:id", requireUser, async (req: any, res) => {
 
     const sender = await prisma.user.findUnique({
       where: { id: senderId },
-      select: { verified: true, name: true },
+      select: { verified: true, name: true, ghostMode: true },
     });
 
     if (!sender) {
@@ -204,27 +204,47 @@ if (!text && !imageUrl && !audioUrl) {
       });
     }
 
-    const message = await prisma.message.create({
-      data: {
-        senderId,
-        receiverId,
-        text: text || null,
-        imageUrl: imageUrl || null,
-        audioUrl: audioUrl || null,
-        replyToId: replyToId || null,
-        conversationId: conversation.id,
-      },
+    const message = await prisma.$transaction(async (tx) => {
+      const createdMessage = await tx.message.create({
+        data: {
+          senderId,
+          receiverId,
+          text: text || null,
+          imageUrl: imageUrl || null,
+          audioUrl: audioUrl || null,
+          replyToId: replyToId || null,
+          conversationId: conversation.id,
+        },
+      });
+
+      if (sender.verified && sender.ghostMode) {
+        await tx.ghostProfileAccess.upsert({
+          where: {
+            profileOwnerId_viewerId: {
+              profileOwnerId: senderId,
+              viewerId: receiverId,
+            },
+          },
+          create: {
+            profileOwnerId: senderId,
+            viewerId: receiverId,
+          },
+          update: {},
+        });
+      }
+
+      await tx.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          lastMessageId: createdMessage.id,
+          updatedAt: new Date(),
+        },
+      });
+
+      return createdMessage;
     });
 
     console.log("🔥 MESSAGE CREATED:", message);
-
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: {
-        lastMessageId: message.id,
-        updatedAt: new Date(),
-      },
-    });
 
     try {
   const io = req.app.get("io");

@@ -66,6 +66,7 @@ router.get("/", requireUser, async (req: AuthRequest, res: Response) => {
       prompts: user.prompts || {},
       preferences: user.preferences || {},
       verified: user.verified,
+      ghostMode: user.ghostMode,
       verification_status: user.verification_status,
       onboardingComplete: user.onboardingComplete,
       lastActiveAt: user.lastActiveAt,
@@ -88,6 +89,10 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
     const param = req.params.id as string;
     const viewerId = req.user?.id;
 
+    if (!viewerId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     if (!param) {
       return res.status(400).json({ error: "Invalid user id" });
     }
@@ -98,6 +103,42 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
 
     if (!user) {
       return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (user.ghostMode && viewerId !== user.id) {
+      const [accessGrant, existingMatch, existingConversation] =
+        await Promise.all([
+          prisma.ghostProfileAccess.findUnique({
+            where: {
+              profileOwnerId_viewerId: {
+                profileOwnerId: user.id,
+                viewerId,
+              },
+            },
+          }),
+          prisma.match.findFirst({
+            where: {
+              OR: [
+                { userAId: user.id, userBId: viewerId },
+                { userAId: viewerId, userBId: user.id },
+              ],
+            },
+            select: { id: true },
+          }),
+          prisma.conversation.findFirst({
+            where: {
+              OR: [
+                { userAId: user.id, userBId: viewerId },
+                { userAId: viewerId, userBId: user.id },
+              ],
+            },
+            select: { id: true },
+          }),
+        ]);
+
+      if (!accessGrant && !existingMatch && !existingConversation) {
+        return res.status(404).json({ error: "Profile not found" });
+      }
     }
 
     const photos = await prisma.photo.findMany({
@@ -127,25 +168,25 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
     }));
 
     return res.json({
-  id: user.id,
-  name: user.name,
-  username: user.username,
-  age: user.age,
-  gender: user.gender,
-  race: user.race,
-  bio: user.bio,
-  location: user.location,
-  latitude: user.latitude,
-  longitude: user.longitude,
-  photos: processedPhotos,
-  isAmbassador: user.role === "ambassador",
-  prompts: user.prompts || {},
-  verified: user.verified,
-  verification_status: user.verification_status,
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      age: user.age,
+      gender: user.gender,
+      race: user.race,
+      bio: user.bio,
+      location: user.location,
+      latitude: user.latitude,
+      longitude: user.longitude,
+      photos: processedPhotos,
+      isAmbassador: user.role === "ambassador",
+      prompts: user.prompts || {},
+      verified: user.verified,
+      verification_status: user.verification_status,
 
-  // 🔥 ONLINE STATUS
-  lastActiveAt: user.lastActiveAt,
-});
+      // 🔥 ONLINE STATUS
+      lastActiveAt: user.lastActiveAt,
+    });
   } catch (err) {
     console.error("PROFILE BY ID ERROR:", err);
     return res.status(500).json({ error: "Server error" });
@@ -153,7 +194,7 @@ router.get("/:id", requireUser, async (req: AuthRequest, res: Response) => {
 });
 
 /* =========================
-   UPDATE PROFILE (UNCHANGED)
+   UPDATE PROFILE AND GHOST MODE
 ========================= */
 router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
   try {
@@ -163,12 +204,26 @@ router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { bio, gender, preferences, prompts } = req.body;
+    const { bio, gender, preferences, prompts, ghostMode } = req.body;
+
+    if (ghostMode !== undefined && typeof ghostMode !== "boolean") {
+      return res.status(400).json({ error: "Invalid ghostMode value" });
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { preferences: true },
+      select: { preferences: true, verified: true },
     });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (ghostMode === true && !existingUser.verified) {
+      return res.status(403).json({
+        error: "Verify your profile to enable Ghost Mode.",
+      });
+    }
 
     const existingPrefs =
       typeof existingUser?.preferences === "object" &&
@@ -193,6 +248,7 @@ router.put("/", requireUser, async (req: AuthRequest, res: Response) => {
         gender,
         preferences: mergedPreferences,
         prompts,
+        ...(typeof ghostMode === "boolean" && { ghostMode }),
       },
     });
 

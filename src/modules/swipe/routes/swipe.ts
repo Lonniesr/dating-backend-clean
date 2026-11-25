@@ -126,6 +126,8 @@ if (isLiked) {
       eloScore: true,
       role: true,
       shadowBanned: true,
+      verified: true,
+      ghostMode: true,
     },
   }),
 
@@ -160,6 +162,23 @@ if (swiper.shadowBanned || target.shadowBanned) {
     isMatch: false,
   });
 }
+
+      // A swipe by a verified ghost-mode user reveals their profile to this target.
+      if (swiper.verified && swiper.ghostMode) {
+        await prisma.ghostProfileAccess.upsert({
+          where: {
+            profileOwnerId_viewerId: {
+              profileOwnerId: swiperId,
+              viewerId: targetId,
+            },
+          },
+          create: {
+            profileOwnerId: swiperId,
+            viewerId: targetId,
+          },
+          update: {},
+        });
+      }
 
       if (swiper && target) {
         const result = isLiked ? 1 : 0;
@@ -267,4 +286,4 @@ if (swiper.shadowBanned || target.shadowBanned) {
   }
 );
 
-export default router; 
+export default router;

@@ -86,6 +86,86 @@ function getPreferenceNumber(value: unknown): number | null {
   return null;
 }
 
+/**
+ * Find ghost-mode profiles in a cached page that this viewer
+ * is not currently allowed to see.
+ */
+async function getHiddenGhostProfileIds(
+  profileIds: string[],
+  viewerId: string
+): Promise<Set<string>> {
+  if (profileIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const ghostedUsers = await prisma.user.findMany({
+    where: {
+      id: {
+        in: profileIds,
+      },
+      ghostMode: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const ghostedUserIds = ghostedUsers.map((user) => user.id);
+
+  if (ghostedUserIds.length === 0) {
+    return new Set<string>();
+  }
+
+  const [accessGrants, conversations] = await Promise.all([
+    prisma.ghostProfileAccess.findMany({
+      where: {
+        profileOwnerId: {
+          in: ghostedUserIds,
+        },
+        viewerId,
+      },
+      select: {
+        profileOwnerId: true,
+      },
+    }),
+    prisma.conversation.findMany({
+      where: {
+        OR: [
+          {
+            userAId: viewerId,
+            userBId: {
+              in: ghostedUserIds,
+            },
+          },
+          {
+            userBId: viewerId,
+            userAId: {
+              in: ghostedUserIds,
+            },
+          },
+        ],
+      },
+      select: {
+        userAId: true,
+        userBId: true,
+      },
+    }),
+  ]);
+
+  const visibleGhostIds = new Set<string>([
+    ...accessGrants.map((grant) => grant.profileOwnerId),
+    ...conversations.map((conversation) =>
+      conversation.userAId === viewerId
+        ? conversation.userBId
+        : conversation.userAId
+    ),
+  ]);
+
+  return new Set(
+    ghostedUserIds.filter((id) => !visibleGhostIds.has(id))
+  );
+}
+
 router.get(
   "/",
   requireUser,
@@ -197,7 +277,24 @@ router.get(
           const cached = await redis.get(cacheKey);
 
           if (cached) {
-            return res.json(JSON.parse(cached));
+            const cachedResponse = JSON.parse(cached);
+            const cachedProfileIds = Array.isArray(cachedResponse?.profiles)
+              ? cachedResponse.profiles
+                  .map((profile: { id?: unknown }) => profile?.id)
+                  .filter((id: unknown): id is string => typeof id === "string")
+              : [];
+
+            const hiddenGhostIds = await getHiddenGhostProfileIds(
+              cachedProfileIds,
+              userId
+            );
+
+            if (hiddenGhostIds.size === 0) {
+              return res.json(cachedResponse);
+            }
+
+            // Rebuild the page instead of returning cached ghost profiles
+            // whose visibility has changed since this cache entry was made.
           }
         } catch (redisError) {
           /*
@@ -374,6 +471,33 @@ router.get(
           photos: {
             some: {},
           },
+
+          OR: [
+            {
+              ghostMode: false,
+            },
+            {
+              ghostAccessGiven: {
+                some: {
+                  viewerId: userId,
+                },
+              },
+            },
+            {
+              conversationsA: {
+                some: {
+                  userBId: userId,
+                },
+              },
+            },
+            {
+              conversationsB: {
+                some: {
+                  userAId: userId,
+                },
+              },
+            },
+          ],
 
           ...(interested === "men" && {
             gender: {

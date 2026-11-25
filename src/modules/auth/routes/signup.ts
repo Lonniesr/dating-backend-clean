@@ -75,21 +75,51 @@ router.post("/", async (req: Request, res: Response) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        onboardingComplete: false,
-        role: "user",
-        inviteCode: inviteRecord.code,
-      },
-      select: {
-  id: true,
-  email: true,
-  role: true,
-  onboardingComplete: true,
-  tokenVersion: true,
-},
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          onboardingComplete: false,
+          role: "user",
+          inviteCode: inviteRecord.code,
+        },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          onboardingComplete: true,
+          tokenVersion: true,
+        },
+      });
+
+      if (inviteRecord.redirectToInviter && inviteRecord.invitedById) {
+        const inviter = await tx.user.findUnique({
+          where: { id: inviteRecord.invitedById },
+          select: {
+            verified: true,
+            ghostMode: true,
+          },
+        });
+
+        if (inviter?.verified && inviter.ghostMode) {
+          await tx.ghostProfileAccess.upsert({
+            where: {
+              profileOwnerId_viewerId: {
+                profileOwnerId: inviteRecord.invitedById,
+                viewerId: createdUser.id,
+              },
+            },
+            create: {
+              profileOwnerId: inviteRecord.invitedById,
+              viewerId: createdUser.id,
+            },
+            update: {},
+          });
+        }
+      }
+
+      return createdUser;
     });
 
     /* =========================

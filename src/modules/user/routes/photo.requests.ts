@@ -18,7 +18,7 @@ router.post("/request", requireUser, async (req: Request, res: Response) => {
 
 const requester = await prisma.user.findUnique({
   where: { id: requesterId },
-  select: { verified: true },
+  select: { verified: true, ghostMode: true },
 });
 
 if (!requester?.verified) {
@@ -61,16 +61,52 @@ if (!requester?.verified) {
     });
 
     if (existing) {
+      if (requester.ghostMode) {
+        await prisma.ghostProfileAccess.upsert({
+          where: {
+            profileOwnerId_viewerId: {
+              profileOwnerId: requesterId,
+              viewerId: photo.userId,
+            },
+          },
+          create: {
+            profileOwnerId: requesterId,
+            viewerId: photo.userId,
+          },
+          update: {},
+        });
+      }
+
       return res.status(400).json({ error: "Already requested" });
     }
 
-    const request = await (prisma as any).photoAccessRequest.create({
-      data: {
-        photoId,
-        requesterId,
-        ownerId: photo.userId,
-        message,
-      },
+    const request = await prisma.$transaction(async (tx) => {
+      const createdRequest = await (tx as any).photoAccessRequest.create({
+        data: {
+          photoId,
+          requesterId,
+          ownerId: photo.userId,
+          message,
+        },
+      });
+
+      if (requester.verified && requester.ghostMode) {
+        await tx.ghostProfileAccess.upsert({
+          where: {
+            profileOwnerId_viewerId: {
+              profileOwnerId: requesterId,
+              viewerId: photo.userId,
+            },
+          },
+          create: {
+            profileOwnerId: requesterId,
+            viewerId: photo.userId,
+          },
+          update: {},
+        });
+      }
+
+      return createdRequest;
     });
 
 /* =========================
@@ -127,9 +163,34 @@ router.post("/respond", requireUser, async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Not authorized" });
     }
 
-    const updated = await (prisma as any).photoAccessRequest.update({
-      where: { id: requestId },
-      data: { status },
+    const owner = await prisma.user.findUnique({
+      where: { id: ownerId },
+      select: { verified: true, ghostMode: true },
+    });
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedRequest = await (tx as any).photoAccessRequest.update({
+        where: { id: requestId },
+        data: { status },
+      });
+
+      if (owner?.verified && owner.ghostMode) {
+        await tx.ghostProfileAccess.upsert({
+          where: {
+            profileOwnerId_viewerId: {
+              profileOwnerId: ownerId,
+              viewerId: request.requesterId,
+            },
+          },
+          create: {
+            profileOwnerId: ownerId,
+            viewerId: request.requesterId,
+          },
+          update: {},
+        });
+      }
+
+      return updatedRequest;
     });
 
 /* =========================
